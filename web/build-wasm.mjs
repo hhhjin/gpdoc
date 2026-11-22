@@ -24,6 +24,6 @@ run([
   "-p", "gpdoc-playground", "--lib",
 ]);
 run([
-  bindgen, "--target", "web", "--out-dir", generated,
+  bindgen, "--target", "web", "--remove-name-section", "--out-dir", generated,
   "--out-name", "gpdoc-editor", resolve(release, "gpdoc_playground.wasm"),
 ]);
