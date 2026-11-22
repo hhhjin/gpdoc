@@ -12,6 +12,7 @@ gpdoc = { workspace = true, features = ["gpui"] }
 gpdoc-core.workspace = true
 gpdoc-plugin.workspace = true
 gpui = { version = "=0.2.2", default-features = false }
+gpui-icons.workspace = true
 gpdoc-plugin-audio.workspace = true
 gpdoc-plugin-mathematics.workspace = true
 gpdoc-plugin-ordered-list.workspace = true

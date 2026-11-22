@@ -2499,6 +2499,7 @@ dependencies = [
  "gpdoc-plugin-text-align",
  "gpdoc-plugin-text-style",
  "gpui",
+ "gpui-icons",
 ]
 
 [[package]]
