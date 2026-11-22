@@ -1,0 +1,52 @@
+[package]
+name = "gpdoc-editor-demo"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "gpdoc-editor-demo"
+path = "main.rs"
+
+[dependencies]
+gpdoc-demo-fonts.workspace = true
+gpui-icons.workspace = true
+gpdoc = { workspace = true, features = ["gpui"] }
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "wayland", "x11"] }
+gpdoc-plugin-audio = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-blockquote = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bold = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bubble-menu.workspace = true
+gpdoc-plugin-bullet-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-code-block = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-details = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-drag-handle.workspace = true
+gpdoc-plugin-drop-cursor.workspace = true
+gpdoc-plugin-gap-cursor.workspace = true
+gpdoc-plugin-hard-break.workspace = true
+gpdoc-plugin-heading = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-highlight = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-horizontal-rule = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-image = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-inline-code = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-italic = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-link = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-list-item = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-list-keymap.workspace = true
+gpdoc-plugin-mathematics = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-mention = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-box-selection.workspace = true
+gpdoc-plugin-node-range.workspace = true
+gpdoc-plugin-ordered-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-paragraph = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-placeholder.workspace = true
+gpdoc-plugin-strike = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-subscript = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-slash-command = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-superscript = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-table = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-task-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-underline = { workspace = true, features = ["gpui"] }
+
+[dev-dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["test-support"] }

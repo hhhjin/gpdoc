@@ -1,0 +1,77 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/*",
+    "crates/gpdoc/examples/editor",
+    "crates/gpdoc/examples/editor/fonts",
+    "plugins/*",
+    "tests/plugins",
+    "tests/gpui",
+    "web/playground",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+readme = "README.md"
+
+[workspace.dependencies]
+gpdoc-demo-fonts = { path = "crates/gpdoc/examples/editor/fonts" }
+gpui-icons = "0.7"
+gpui = { version = "=0.2.2", default-features = false }
+gpui-browser = { package = "gpui-unofficial", version = "=1.29.1", default-features = false }
+gpdoc = { path = "crates/gpdoc", version = "0.1.0" }
+gpdoc-core = { path = "crates/gpdoc-core", version = "0.1.0" }
+gpdoc-plugin-audio = { path = "plugins/audio", version = "0.1.0" }
+gpdoc-plugin-blockquote = { path = "plugins/blockquote", version = "0.1.0" }
+gpdoc-plugin-bold = { path = "plugins/bold", version = "0.1.0" }
+gpdoc-plugin-bubble-menu = { path = "plugins/bubble-menu", version = "0.1.0" }
+gpdoc-plugin-bullet-list = { path = "plugins/bullet-list", version = "0.1.0" }
+gpdoc-plugin-character-count = { path = "plugins/character-count", version = "0.1.0" }
+gpdoc-plugin-code-block = { path = "plugins/code-block", version = "0.1.0" }
+gpdoc-plugin-code-block-lowlight = { path = "plugins/code-block-lowlight", version = "0.1.0" }
+gpdoc-plugin-collaboration = { path = "plugins/collaboration", version = "0.1.0" }
+gpdoc-plugin-collaboration-caret = { path = "plugins/collaboration-caret", version = "0.1.0" }
+gpdoc-plugin-details = { path = "plugins/details", version = "0.1.0" }
+gpdoc-plugin-drag-handle = { path = "plugins/drag-handle", version = "0.1.0" }
+gpdoc-plugin-drop-cursor = { path = "plugins/drop-cursor", version = "0.1.0" }
+gpdoc-plugin-file-handler = { path = "plugins/file-handler", version = "0.1.0" }
+gpdoc-plugin-find-and-replace = { path = "plugins/find-and-replace", version = "0.1.0" }
+gpdoc-plugin-floating-menu = { path = "plugins/floating-menu", version = "0.1.0" }
+gpdoc-plugin-focus = { path = "plugins/focus", version = "0.1.0" }
+gpdoc-plugin-gap-cursor = { path = "plugins/gap-cursor", version = "0.1.0" }
+gpdoc-plugin-hard-break = { path = "plugins/hard-break", version = "0.1.0" }
+gpdoc-plugin-heading = { path = "plugins/heading", version = "0.1.0" }
+gpdoc-plugin-highlight = { path = "plugins/highlight", version = "0.1.0" }
+gpdoc-plugin-horizontal-rule = { path = "plugins/horizontal-rule", version = "0.1.0" }
+gpdoc-plugin-image = { path = "plugins/image", version = "0.1.0" }
+gpdoc-plugin-inline-code = { path = "plugins/inline-code", version = "0.1.0" }
+gpdoc-plugin-invisible-characters = { path = "plugins/invisible-characters", version = "0.1.0" }
+gpdoc-plugin-italic = { path = "plugins/italic", version = "0.1.0" }
+gpdoc-plugin-link = { path = "plugins/link", version = "0.1.0" }
+gpdoc-plugin-list-item = { path = "plugins/list-item", version = "0.1.0" }
+gpdoc-plugin-list-keymap = { path = "plugins/list-keymap", version = "0.1.0" }
+gpdoc-plugin-list-kit = { path = "plugins/list-kit", version = "0.1.0" }
+gpdoc-plugin-mathematics = { path = "plugins/mathematics", version = "0.1.0" }
+gpdoc-plugin-mention = { path = "plugins/mention", version = "0.1.0" }
+gpdoc-plugin-box-selection = { path = "plugins/box-selection", version = "0.1.0" }
+gpdoc-plugin-node-range = { path = "plugins/node-range", version = "0.1.0" }
+gpdoc-plugin-ordered-list = { path = "plugins/ordered-list", version = "0.1.0" }
+gpdoc-plugin-paragraph = { path = "plugins/paragraph", version = "0.1.0" }
+gpdoc-plugin-placeholder = { path = "plugins/placeholder", version = "0.1.0" }
+gpdoc-plugin-ruby-text = { path = "plugins/ruby-text", version = "0.1.0" }
+gpdoc-plugin-strike = { path = "plugins/strike", version = "0.1.0" }
+gpdoc-plugin-subscript = { path = "plugins/subscript", version = "0.1.0" }
+gpdoc-plugin-slash-command = { path = "plugins/slash-command", version = "0.1.0" }
+gpdoc-plugin-suggestion = { path = "plugins/suggestion", version = "0.1.0" }
+gpdoc-plugin-superscript = { path = "plugins/superscript", version = "0.1.0" }
+gpdoc-plugin = { path = "crates/gpdoc-plugin", version = "0.1.0" }
+gpdoc-plugin-table = { path = "plugins/table", version = "0.1.0" }
+gpdoc-plugin-table-of-contents = { path = "plugins/table-of-contents", version = "0.1.0" }
+gpdoc-plugin-task-list = { path = "plugins/task-list", version = "0.1.0" }
+gpdoc-plugin-text-align = { path = "plugins/text-align", version = "0.1.0" }
+gpdoc-plugin-text-style = { path = "plugins/text-style", version = "0.1.0" }
+gpdoc-plugin-trailing-node = { path = "plugins/trailing-node", version = "0.1.0" }
+gpdoc-plugin-typography = { path = "plugins/typography", version = "0.1.0" }
+gpdoc-plugin-underline = { path = "plugins/underline", version = "0.1.0" }
+gpdoc-plugin-unique-id = { path = "plugins/unique-id", version = "0.1.0" }

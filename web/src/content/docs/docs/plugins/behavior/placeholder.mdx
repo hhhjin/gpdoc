@@ -1,0 +1,40 @@
+---
+title: Placeholder
+description: Show a writing hint in an empty text block.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Click the empty paragraph and type an update. Delete what you typed to see the hint again.
+
+<ViewPluginExample plugin="placeholder" title="Placeholder example" />
+
+## Register the plugin
+
+In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+
+```sh
+cargo add gpdoc-plugin-placeholder
+```
+
+```rust
+use gpdoc_plugin_placeholder::placeholder;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(placeholder("Write an update…"))
+    .build()?;
+```
+
+Pass your own painter to `.with_view(...)` to change the appearance. It receives a `PlaceholderHint` with the block position, first-line bounds, and first line of the hint text. Call `DecorationFrame::paint_text` to use the current editor font and line height.
+
+Place the caret in an empty top-level paragraph to see the hint. Typing the first character hides it. The view paints the hint without adding text to the document. To try it, press **Enter** at the end of a paragraph in the [quickstart editor](/docs/quickstart/#try-the-editor).
+
+By default the hint appears only in the block containing the selection anchor. To include all empty blocks, set `current_only = false` on the value returned by `placeholder(text)`. Set `include_children = true` to include nested empty blocks before registration.
+
+## Source code
+
+[placeholder/src/lib.rs](/source/plugins/placeholder/src/lib.rs.txt)

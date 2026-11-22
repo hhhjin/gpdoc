@@ -1,0 +1,64 @@
+---
+title: Hard break
+description: Insert a line break within a paragraph.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`hard_break()` adds an inline break. Use it for content such as an address that needs several lines within one paragraph.
+
+## Try it
+
+<PluginExample plugin="hard-break" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-hard-break
+```
+
+Register `hard_break()` with `paragraph()`. The inline `hardBreak` node takes no attributes.
+
+## Insert a break between two words
+
+In a [Quickstart project](/docs/quickstart/), put the caret between `First` and `Second` and insert a break.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
+use gpdoc_plugin_hard_break::hard_break;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(hard_break())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "FirstSecond")])?;
+editor.select(Selection::caret(DocPos(6)))?;
+editor.run(gpdoc_plugin_hard_break::Set)?;
+
+assert_eq!(editor.document().blocks().len(), 1);
+assert_eq!(editor.document().node_at(DocPos(6)).unwrap().kind, "hardBreak");
+```
+
+The first paragraph’s text starts at position `1`. Its five-character prefix `First` puts the break at position `6`.
+
+## Commands
+
+### `setHardBreak`
+
+Insert an inline break at the caret or replace selected text with a break. The text selection must be in content that accepts an inline break. The next line keeps the active typing marks, so a bold word can continue in bold after the break.
+
+```rust
+editor.run(gpdoc_plugin_hard_break::Set)?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Shift + Enter** | Insert a hard break. |
+| **Mod + Enter** | Insert a hard break. |
+
+## Source code
+
+[hard-break/src/lib.rs](/source/plugins/hard-break/src/lib.rs.txt)

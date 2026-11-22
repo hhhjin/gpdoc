@@ -1,0 +1,54 @@
+---
+title: Drag handle
+description: Move top-level blocks by dragging a handle in the editor gutter.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Drag the handle beside “Review the draft” above “Draft the outline” to swap their order.
+
+<ViewPluginExample plugin="drag-handle" title="Drag handle example" />
+
+## Register the plugin
+
+Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
+
+```sh
+cargo add gpdoc-plugin-drag-handle
+```
+
+Bare `.plugin(drag_handle())` displays a grip in the gutter. Supply a view to customize the grip and drag preview.
+
+```rust
+use gpdoc_plugin_drag_handle::drag_handle;
+use gpdoc_plugin_paragraph::paragraph;
+
+mod handles;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(drag_handle().with_view(handles::block_handle))
+    .build()?;
+```
+
+Compose the gutter grip and the preview in `handles.rs`. The plugin attaches the drag gesture, keeps the editor focused, and moves the block when the drag ends. Use `slot.editor` and `slot.before` to look up the originating block.
+
+```rust
+use gpdoc_plugin_drag_handle::{DragHandlePart, DragHandleSlot};
+use gpui::{App, Window, div, prelude::*};
+
+pub fn block_handle(slot: DragHandleSlot, _: &mut Window, _: &mut App) -> gpui::Div {
+    div().child(match slot.part {
+        DragHandlePart::Grip => "⠿",
+        DragHandlePart::Preview => "Move block",
+    })
+}
+```
+
+Drag a block's gutter handle to another block boundary in the same editor. If the handle is inside a selected [node range](/docs/plugins/behavior/node-range/), the selected blocks move together.
+
+## Source code
+
+[drag-handle/src/lib.rs](/source/plugins/drag-handle/src/lib.rs.txt)

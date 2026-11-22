@@ -1,0 +1,82 @@
+---
+title: Ruby text
+description: Attach a pronunciation guide to text such as Japanese kanji.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Ruby text adds the `rubyText` mark. The mark stores a reading in `rt`. Attach `ruby_text_format` to display the reading above the base text in GPUI.
+
+## Try it
+
+<PluginExample plugin="ruby-text" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-ruby-text
+```
+
+Register `gpdoc_plugin_ruby_text::ruby_text()` alongside `paragraph()`.
+
+## Example
+
+The first paragraph starts at document position `1`. The range `1..3` selects `東京`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_ruby_text::ruby_text;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(ruby_text())
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "東京へ行きます。")])?;
+	editor.select(Selection::Text {
+		anchor: DocPos(1),
+		head: DocPos(3),
+	})?;
+
+	editor.run(gpdoc_plugin_ruby_text::Set { rt: Some("とうきょう".into()) })?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The document stores one annotation for the selected pair. The following characters have no reading.
+
+## Commands
+
+The mark stores its reading in `rt`, a nullable string with default `null`. `editor.run` returns `Result<CommandOutcome, Error>`. Set and toggle can return `NotApplicable` where the schema excludes this mark.
+
+### `setRubyText`
+
+Attach a reading to the selected base text, or replace the reading already there. Pass the pronunciation as `rt`.
+
+```rust
+editor.run(gpdoc_plugin_ruby_text::Set { rt: Some("とうきょう".into()) })?;
+```
+
+### `toggleRubyText`
+
+Remove a matching reading or apply the one supplied. At a caret inside an annotation, remove the whole contiguous reading.
+
+```rust
+editor.run(gpdoc_plugin_ruby_text::Toggle { rt: Some("とうきょう".into()) })?;
+```
+
+### `unsetRubyText`
+
+Remove the reading and keep the base text. Place the caret inside a reading to clear its contiguous range in one command.
+
+```rust
+editor.run(gpdoc_plugin_ruby_text::Unset)?;
+```
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-ruby-text`. In a GPUI editor, `ruby_text()` displays the reading above its base text. To supply your own formatter, import `gpdoc::PluginViewExt` and register `ruby_text().with_view(my_ruby_text_view)`.

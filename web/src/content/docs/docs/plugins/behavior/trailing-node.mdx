@@ -1,0 +1,89 @@
+---
+title: Trailing node
+description: Keep an editable block at the end of a document after edits.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Trailing node appends a block when an edit leaves a different block type at the end of the document. An empty paragraph after a media block or heading gives the writer a place to continue typing.
+
+## Try it
+
+<PluginExample plugin="trailing-node" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-trailing-node
+```
+
+## Keep a paragraph after a heading
+
+For this example, add `gpdoc-plugin-heading` to the Quickstart project. Turning the final paragraph into a heading leaves a new empty paragraph after it.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_heading::heading;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_trailing_node::trailing_node;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(heading())
+    .plugin(trailing_node())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Release notes")])?;
+editor.run(gpdoc_plugin_heading::Set(gpdoc_plugin_heading::Level::H1))?;
+
+assert_eq!(
+	editor.document().blocks().last(),
+	Some(&Node::text("paragraph", "")),
+);
+```
+
+## Settings
+
+### Trailing block type
+
+The default constructor uses the document schema’s default block. To choose a specific block, pass its registered name as `Some(String)` to `trailing_node_with`. The schema must be able to fill its default content and attributes.
+
+```rust
+use gpdoc_plugin_trailing_node::trailing_node_with;
+
+let plugin = trailing_node_with(Some("paragraph".into()), vec![]);
+```
+
+### Excluded final blocks
+
+The second argument, `not_after: Vec<String>`, defaults to an empty list. List types that may end the document as they are. A final block of the configured trailing type also skips insertion.
+
+```rust
+let plugin = trailing_node_with(None, vec!["heading".into()]);
+```
+
+## Editing and history
+
+### Opening a document
+
+Opening existing content preserves its final block. The plugin checks the end of the document after an edit.
+
+```rust
+use gpdoc::Editor;
+let initial = Editor::from_document(&config, vec![Node::text("heading", "Release notes")])?;
+assert_eq!(initial.document().blocks().len(), 1);
+```
+
+### Undo an appended block
+
+The triggering edit and the appended paragraph share one history entry. After the heading conversion above, one undo restores the original paragraph.
+
+```rust
+editor.undo()?;
+assert_eq!(editor.document().blocks(), [Node::text("paragraph", "Release notes")]);
+```
+
+## Source code
+
+[trailing-node/src/lib.rs](/source/plugins/trailing-node/src/lib.rs.txt)

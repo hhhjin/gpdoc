@@ -1,0 +1,4 @@
+[workspace]
+release_always = false
+# The release command uses this flag to read the versioned changelog for GitHub Releases.
+changelog_update = true

@@ -1,0 +1,63 @@
+[package]
+name = "gpdoc-gpui-tests"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[features]
+native-tests = ["gpdoc/native-tests", "gpui/test-support"]
+
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+gpdoc = { workspace = true, features = ["gpui"] }
+gpdoc-core.workspace = true
+gpdoc-plugin.workspace = true
+gpui = { version = "=0.2.2", default-features = false }
+gpdoc-plugin-audio.workspace = true
+gpdoc-plugin-mathematics.workspace = true
+gpdoc-plugin-ordered-list.workspace = true
+gpdoc-plugin-blockquote.workspace = true
+gpdoc-plugin-bold = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bubble-menu.workspace = true
+gpdoc-plugin-bullet-list.workspace = true
+gpdoc-plugin-code-block.workspace = true
+gpdoc-plugin-collaboration = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-collaboration-caret = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-details = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-drag-handle.workspace = true
+gpdoc-plugin-drop-cursor.workspace = true
+gpdoc-plugin-file-handler.workspace = true
+gpdoc-plugin-find-and-replace = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-floating-menu.workspace = true
+gpdoc-plugin-focus.workspace = true
+gpdoc-plugin-gap-cursor.workspace = true
+gpdoc-plugin-heading = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-highlight.workspace = true
+gpdoc-plugin-horizontal-rule = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-image = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-invisible-characters = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-italic = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-mention = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-box-selection.workspace = true
+gpdoc-plugin-node-range.workspace = true
+gpdoc-plugin-paragraph = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-placeholder.workspace = true
+gpdoc-plugin-ruby-text = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-slash-command = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-table = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-task-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-text-align = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-text-style = { workspace = true, features = ["gpui"] }
+
+[[test]]
+name = "plugins"
+required-features = ["native-tests"]
+
+[[test]]
+name = "macos_keybindings"
+harness = false
+required-features = ["native-tests"]
+
+[[test]]
+name = "macos_text_geometry"
+harness = false
+required-features = ["native-tests"]

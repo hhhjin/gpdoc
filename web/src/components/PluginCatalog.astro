@@ -1,0 +1,179 @@
+---
+import { getEntries } from "astro:content";
+import { pluginGroups } from "../plugin-groups.mjs";
+
+const base = import.meta.env.BASE_URL;
+const groups = await Promise.all(pluginGroups.map(async ({ slug, label, pages }) => ({
+  slug,
+  label,
+  entries: await getEntries(pages.map((page) => ({ collection: "docs", id: `docs/plugins/${page}` }))),
+})));
+---
+
+<plugin-catalog class="not-content" data-pagefind-ignore>
+  <div class="catalog-search" data-search-controls hidden>
+    <label>
+      <span>Find a plugin</span>
+      <input type="search" placeholder="Search by name, crate, or use" autocomplete="off" />
+    </label>
+    <p data-count role="status"></p>
+  </div>
+  {groups.map(({ slug, label, entries }) => (
+    <section class="catalog-group" data-group aria-labelledby={slug}>
+      <h2 id={slug}>{label}</h2>
+      <ul class="catalog-list">
+        {entries.map(({ id, data }) => (
+          <li data-plugin={`gpdoc-plugin-${id.split("/").at(-1)}`}>
+            <a href={`${base}${id}/`}>
+              <span class="catalog-title">{data.title}</span>
+              <span class="catalog-description">{data.description}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+  <p class="catalog-empty" data-empty hidden>Try a different name or keyword.</p>
+</plugin-catalog>
+
+<script>
+  class PluginCatalog extends HTMLElement {
+    connectedCallback() {
+      const input = this.querySelector("input");
+      const controls = this.querySelector<HTMLElement>("[data-search-controls]");
+      const count = this.querySelector<HTMLElement>("[data-count]");
+      const empty = this.querySelector<HTMLElement>("[data-empty]");
+      if (!input || !controls || !count || !empty) return;
+
+      const groups = Array.from(this.querySelectorAll<HTMLElement>("[data-group]"), (section) => ({
+        section,
+        entries: Array.from(section.querySelectorAll<HTMLElement>("[data-plugin]"), (entry) => ({
+          entry,
+          searchText: `${entry.dataset.plugin} ${entry.textContent}`.toLowerCase(),
+        })),
+      }));
+
+      const filter = () => {
+        const words = input.value.toLowerCase().trim().split(/\s+/);
+        let matches = 0;
+        for (const { section, entries } of groups) {
+          let groupMatches = 0;
+          for (const { entry, searchText } of entries) {
+            const visible = words.every((word) => searchText.includes(word));
+            entry.hidden = !visible;
+            if (visible) groupMatches++;
+          }
+          section.hidden = groupMatches === 0;
+          matches += groupMatches;
+        }
+        count.textContent = `${matches} ${matches === 1 ? "plugin" : "plugins"}`;
+        empty.hidden = matches > 0;
+      };
+
+      input.oninput = filter;
+      filter();
+      controls.hidden = false;
+    }
+  }
+
+  customElements.define("plugin-catalog", PluginCatalog);
+</script>
+
+<style>
+  plugin-catalog {
+    display: block;
+  }
+
+  .catalog-search:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem 1rem;
+    margin-block: 1.5rem;
+  }
+
+  .catalog-search label {
+    display: grid;
+    flex: 1 1 15rem;
+    gap: 0.3rem;
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+
+  .catalog-search input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.875rem;
+    background: var(--sl-color-bg-sidebar);
+    color: var(--sl-color-white);
+    font: inherit;
+    font-weight: 400;
+  }
+
+  .catalog-search [data-count] {
+    padding-block: 0.65rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .catalog-group {
+    margin-block: 1.75rem;
+  }
+
+  .catalog-group h2 {
+    margin-block-end: 0.7rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-h3);
+    font-weight: 650;
+  }
+
+  .catalog-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    grid-auto-rows: 1fr;
+    gap: 0.625rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .catalog-list a {
+    display: grid;
+    align-content: start;
+    gap: 0.2rem;
+    height: 100%;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.55rem;
+    padding: 0.75rem 0.875rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+
+  .catalog-list a:hover,
+  .catalog-list a:focus-visible {
+    border-color: var(--sl-color-text-accent);
+    background: var(--sl-color-bg-sidebar);
+  }
+
+  .catalog-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-weight: 650;
+  }
+
+  .catalog-title::after {
+    content: "→" / "";
+    color: var(--sl-color-gray-3);
+  }
+
+  .catalog-description,
+  .catalog-empty {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+</style>

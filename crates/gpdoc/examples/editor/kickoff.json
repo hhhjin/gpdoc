@@ -1,0 +1,241 @@
+{
+  "type": "doc",
+  "content": [
+    {"type": "heading", "attrs": {"level": 1}, "content": [{"type": "text", "text": "Project kickoff"}]},
+    {
+      "type": "paragraph",
+      "content": [{"type": "text", "text": "This week, five people will try the editor for the first time. We’ll watch them write meeting notes and use their feedback to plan the next release."}]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {"type": "text", "text": "Owner  ", "marks": [{"type": "bold"}]},
+        {"type": "mention", "attrs": {"id": "ada", "label": "Ada"}},
+        {"type": "text", "text": "   ·   "},
+        {"type": "text", "text": "Guide  ", "marks": [{"type": "bold"}]},
+        {
+          "type": "text",
+          "text": "gpdoc quickstart",
+          "marks": [{"type": "link", "attrs": {"href": "https://gpdoc.dev/docs/quickstart/"}}]
+        }
+      ]
+    },
+    {"type": "horizontalRule"},
+    {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "This week’s goal"}]},
+    {
+      "type": "blockquote",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {"type": "text", "text": "Someone opening the editor for the first time should be able to "},
+            {"type": "text", "text": "write a note, check off a task, and mention a teammate", "marks": [{"type": "highlight"}]},
+            {"type": "text", "text": " without asking for help."}
+          ]
+        }
+      ]
+    },
+    {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Discussion"}]},
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "What do people think they can do when they first open the page?"}]}]
+        },
+        {
+          "type": "listItem",
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Where do they pause before making their first edit?"}]},
+            {"type": "bulletList", "content": [
+              {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Record the block they tried to edit and what they clicked first."}]}]}
+            ]}
+          ]
+        }
+      ]
+    },
+    {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Before the review"}]},
+    {
+      "type": "taskList",
+      "content": [
+        {
+          "type": "taskItem",
+          "attrs": {"checked": true},
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Invite the team and book a review slot"}]}]
+        },
+        {
+          "type": "taskItem",
+          "attrs": {"checked": false},
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Prepare a sample document for each participant"}]}]
+        }
+      ]
+    },
+    {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Review schedule"}]},
+    {
+      "type": "table",
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableHeader",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Session"}]}]
+            },
+            {
+              "type": "tableHeader",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Owner"}]}]
+            },
+            {
+              "type": "tableHeader",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Deliverable"}]}]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Monday · Draft"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Ada"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Sample document"}]}]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Wednesday · Observe"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Lin"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Session notes"}]}]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Friday · Review"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Sam"}]}]
+            },
+            {
+              "type": "tableCell",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Fixes for next week"}]}]
+            }
+          ]
+        }
+      ]
+    },
+    {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Session plan"}]},
+    {
+      "type": "image",
+      "attrs": {
+        "src": "session-plan.png",
+        "alt": "A 15-minute session: 3 minutes for the brief, 8 for writing, and 4 for the debrief.",
+        "width": 560,
+        "height": 82
+      }
+    },
+    {
+      "type": "orderedList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Ask the participant to start a fresh paragraph and write a few meeting notes."}]}]
+        },
+        {
+          "type": "listItem",
+          "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Note where they pause. Ask what they expected to happen."}]}]
+        }
+      ]
+    },
+    {
+      "type": "details",
+      "attrs": {"open": true},
+      "content": [
+        {"type": "detailsSummary", "content": [{"type": "text", "text": "Questions for the facilitator"}]},
+        {
+          "type": "detailsContent",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Where did you hesitate?"},
+                {"type": "hardBreak"},
+                {"type": "text", "text": "What helped you decide what to do next?"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {"type": "horizontalRule"},
+    {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Rehearsal notes"}]},
+    {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Start cue"}]},
+    {"type": "paragraph", "content": [{"type": "text", "text": "Start the timer when you hear the chime."}]},
+    {"type": "audio", "attrs": {"src": "/examples/chime.wav"}},
+    {"type": "heading", "attrs": {"level": 4}, "content": [{"type": "text", "text": "Run the demo"}]},
+    {
+      "type": "paragraph",
+      "content": [
+        {"type": "text", "text": "Launch "},
+        {"type": "text", "text": "gpdoc-editor-demo", "marks": [{"type": "code"}]},
+        {"type": "text", "text": " from the repository root."}
+      ]
+    },
+    {
+      "type": "codeBlock",
+      "attrs": {"language": "sh"},
+      "content": [{"type": "text", "text": "cargo run --locked -p gpdoc-editor-demo"}]
+    },
+    {"type": "heading", "attrs": {"level": 4}, "content": [{"type": "text", "text": "Timing"}]},
+    {
+      "type": "paragraph",
+      "content": [
+        {"type": "text", "text": "Let "},
+        {"type": "text", "text": "t", "marks": [{"type": "italic"}]},
+        {"type": "text", "text": "0", "marks": [{"type": "subscript"}]},
+        {"type": "text", "text": " be the time of the first keystroke. Record elapsed time in seconds and variance in s"},
+        {"type": "text", "text": "2", "marks": [{"type": "superscript"}]},
+        {"type": "text", "text": "."}
+      ]
+    },
+    {"type": "heading", "attrs": {"level": 5}, "content": [{"type": "text", "text": "Completion rate"}]},
+    {
+      "type": "paragraph",
+      "content": [
+        {"type": "text", "text": "For our "},
+        {"type": "inlineMath", "attrs": {"latex": "n = 5"}},
+        {"type": "text", "text": " participants, calculate the percentage who finish their notes."}
+      ]
+    },
+    {"type": "blockMath", "attrs": {"latex": "p = \\frac{n_{\\mathrm{done}}}{n} \\times 100\\%"}},
+    {"type": "heading", "attrs": {"level": 6}, "content": [{"type": "text", "text": "Counting a session"}]},
+    {
+      "type": "paragraph",
+      "content": [
+        {"type": "text", "text": "Count every saved document.", "marks": [{"type": "strike"}]},
+        {"type": "text", "text": " Count only "},
+        {"type": "text", "text": "documents the participant saved independently", "marks": [{"type": "underline"}]},
+        {"type": "text", "text": "."}
+      ]
+    }
+  ]
+}

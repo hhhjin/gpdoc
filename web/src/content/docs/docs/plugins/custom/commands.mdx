@@ -1,0 +1,73 @@
+---
+title: Commands and shortcuts
+description: Define a typed command that replaces the selection, bind a shortcut, and test it in a headless editor.
+---
+
+Add a second plugin to the [writing crate](/docs/plugins/custom/first-plugin/). Its `insertSnippet` command accepts a string and replaces the selected text with it. At a caret, the same command inserts the string.
+
+## Declare the command
+
+Create `src/commands.rs`.
+
+```rust
+use gpdoc_plugin::prelude::*;
+
+#[derive(Clone)]
+pub struct InsertSnippet {
+    pub text: String,
+}
+
+impl Command for InsertSnippet {
+    const NAME: &'static str = "insertSnippet";
+}
+
+pub fn snippets() -> Plugin {
+    Plugin::new("snippets", |p| {
+        p.command::<InsertSnippet>(|ctx, InsertSnippet { text }| {
+            let Selection::Text { anchor, head } = ctx.selection() else {
+                return Ok(None);
+            };
+            let range = anchor.min(head)..anchor.max(head);
+            Ok(Some(ctx.one_step(Edit::ReplaceText { range, text })))
+        });
+        p.shortcut("Mod-Alt-j", InsertSnippet { text: "Hi!".to_owned() });
+    })
+}
+```
+
+The command carries the replacement text in its `text` field. Pressing **Mod-Alt-J** supplies `"Hi!"`. Mod is Command on macOS and Ctrl on Linux.
+
+The handler orders the selection endpoints so dragging backward replaces the same range as dragging forward. Returning `Ok(None)` for other selection types lets keyboard dispatch try another matching binding.
+
+Export the plugin and its command type from `src/lib.rs`.
+
+```rust
+mod commands;
+pub use commands::{InsertSnippet, snippets};
+```
+
+## Replace a selection in a test
+
+Create `tests/commands.rs`. Construct the same command with different text to test the command independently of the keyboard.
+
+```rust
+use gpdoc::{Editor, EditorConfig};
+use gpdoc_plugin::prelude::*;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_writing::{InsertSnippet, snippets};
+
+#[test]
+fn replace_selected_text() -> Result<(), Error> {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(snippets())
+        .build()?;
+    let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Draft")])?;
+    editor.select(Selection::Text { anchor: DocPos(6), head: DocPos(1) })?;
+    editor.run(InsertSnippet { text: "Ready".to_owned() })?;
+    assert_eq!(editor.document().blocks(), [Node::text("paragraph", "Ready")]);
+    Ok(())
+}
+```
+
+Run `cargo test --test commands`. Position 1 is the start of the paragraph's text. Position 6 falls after the five letters of `Draft`.

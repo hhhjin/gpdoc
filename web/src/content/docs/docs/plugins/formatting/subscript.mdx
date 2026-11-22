@@ -1,0 +1,86 @@
+---
+title: Subscript
+description: Display selected characters below the text baseline.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Subscript adds the `subscript` mark. Use it for parts of a formula such as the `2` in H₂O.
+
+## Try it
+
+<PluginExample plugin="subscript" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-subscript
+```
+
+Register `gpdoc_plugin_subscript::subscript()` alongside `paragraph()`.
+
+## Example
+
+The first paragraph starts at document position `1`. The range `2..3` selects `2`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_subscript::subscript;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(subscript())
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "H2O")])?;
+	editor.select(Selection::Text {
+		anchor: DocPos(2),
+		head: DocPos(3),
+	})?;
+
+	editor.run(gpdoc_plugin_subscript::Set)?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The digit sits below the baseline between H and O. Removing the mark restores its normal position.
+
+## Commands
+
+These commands take no arguments. Select text to change its formatting, or place the caret where you want to start typing. `editor.run` returns `Result<CommandOutcome, Error>`. A handled command returns `Applied(AppliedChange)`. Set and toggle return `NotApplicable` if no text can take the mark.
+
+### `setSubscript`
+
+Apply subscript to the selection or to the next characters typed at the caret.
+
+```rust
+editor.run(gpdoc_plugin_subscript::Set)?;
+```
+
+### `toggleSubscript`
+
+Switch subscript off when the whole eligible selection has the mark. On a mixed selection, apply it throughout.
+
+```rust
+editor.run(gpdoc_plugin_subscript::Toggle)?;
+```
+
+### `unsetSubscript`
+
+Clear subscript from the selection or turn it off for subsequent typing.
+
+```rust
+editor.run(gpdoc_plugin_subscript::Unset)?;
+```
+
+## Keyboard shortcuts
+
+Toggle subscript with **Command + ,** on macOS or **Ctrl + ,** on Windows and Linux.
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-subscript`. In a GPUI editor, `subscript()` lowers marked text below the baseline. To supply your own formatter, import `gpdoc::PluginViewExt` and register `subscript().with_view(my_subscript_view)`.

@@ -1,0 +1,76 @@
+---
+title: List kit
+description: Install bullet, ordered, and task lists together.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`list_kit()` registers bullet lists, ordered lists, task lists, their item types, and the list keyboard shortcuts. Your editor config still needs a paragraph plugin.
+
+## Try it
+
+<PluginExample plugin="list-kit" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-list-kit gpdoc-plugin-task-list
+```
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), create a checklist from a typed marker.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_list_kit::list_kit;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugins(list_kit())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
+editor.insert_text("[ ] ")?;
+editor.insert_text("Review the copy")?;
+
+assert_eq!(editor.document().blocks()[0].kind, "taskList");
+```
+
+The space after `[ ]` triggers the input rule. The second call inserts the label inside the new unchecked item.
+
+## Settings
+
+`gpdoc_plugin_list_kit::list_kit()` takes no options. Register it once alongside `paragraph()`. For nested task lists, register the individual plugins with [nested task items](/docs/plugins/structure/task-list/) enabled.
+
+## Commands
+
+### Switch list type
+
+With the caret inside an item, convert the enclosing list to a checklist.
+
+```rust
+editor.run(gpdoc_plugin_task_list::Toggle)?;
+```
+
+### Included plugins
+
+| Included registration | Commands and where to use them |
+| --- | --- |
+| [`bullet_list()`](/docs/plugins/structure/bullet-list/) | `wrapInBulletList` wraps paragraphs. `toggleBulletList` also lifts bullet items or converts a compatible list. |
+| [`ordered_list()`](/docs/plugins/structure/ordered-list/) | `wrapInOrderedList` and `toggleOrderedList` work on the corresponding paragraphs or list. For a new list, pass an integer `start` (default `1`) and an optional string `type` (default `null`). |
+| [`list_item()`](/docs/plugins/structure/list-item/) | `splitListItem` splits at a text selection in one paragraph. `sinkListItem` nests the item under its preceding sibling. `liftListItem` moves it up a level. |
+| [`task_list()` and `task_item()`](/docs/plugins/structure/task-list/) | `toggleTaskList` wraps paragraphs, lifts task items, or converts a compatible list. Inside a task item, `splitTaskItem` splits its paragraph and `liftTaskItem` lifts the item. New items default to `checked = false`. |
+| [`list_keymap()`](/docs/plugins/structure/list-keymap/) | With a caret at an item boundary, `listBackspace` lifts or joins and `listDelete` joins forward. At the start of a block after a list, `listTab` moves the block into the preceding item when the schema permits it. |
+
+Pass empty `Attrs` unless you need the ordered list’s `start` or `type` attribute.
+
+## Keyboard shortcuts
+
+Use **Mod + Shift + 8** for bullets, **Mod + Shift + 7** for numbering, and **Mod + Shift + 9** for a checklist. Inside an item, **Enter** splits at the caret. On an empty item it lifts the item one level.
+
+At the start of an empty paragraph, type `-`, `1.`, or `[ ]` followed by a space to create a bullet, numbered step, or unchecked task.
+
+## Source code
+
+[list-kit/src/lib.rs](/source/plugins/list-kit/src/lib.rs.txt)

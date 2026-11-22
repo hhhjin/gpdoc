@@ -1,0 +1,19 @@
+---
+title: Overview
+description: Use gpdoc to edit ProseMirror and Tiptap documents in a GPUI app.
+---
+
+import PluginExample from "../../../components/PluginExample.astro";
+
+gpdoc is a rich-text editor framework for GPUI. If your app already uses ProseMirror or Tiptap, its web editor and your GPUI app can read and write the same document JSON. Enable the gpdoc plugins that match the content in your documents.
+
+When you port a Tiptap extension, keep the node names and attributes your documents already use. Define each editing command as a Rust type and register its handler in the plugin.
+
+<PluginExample plugin="overview" />
+
+## Use gpdoc in your app
+
+- [Add an editor to a GPUI window](/docs/quickstart/) to handle keyboard input, selection, and clipboard actions.
+- [Open an existing Tiptap document](/docs/tiptap/) to edit its JSON in Rust and save it in the same format.
+- [Browse the plugin catalog](/docs/plugins/) to add features such as lists, tables, and links.
+- [Write a custom plugin](/docs/plugins/custom/first-plugin/) to define and test an editable caption block.

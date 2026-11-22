@@ -1,0 +1,86 @@
+---
+title: Superscript
+description: Display selected characters above the text baseline.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Superscript adds the `superscript` mark. Use it for an exponent such as the `2` in x² or for a footnote number.
+
+## Try it
+
+<PluginExample plugin="superscript" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-superscript
+```
+
+Register `gpdoc_plugin_superscript::superscript()` alongside `paragraph()`.
+
+## Example
+
+The first paragraph starts at document position `1`. The range `2..3` selects `2`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_superscript::superscript;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(superscript())
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "x2")])?;
+	editor.select(Selection::Text {
+		anchor: DocPos(2),
+		head: DocPos(3),
+	})?;
+
+	editor.run(gpdoc_plugin_superscript::Set)?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The view raises the exponent above the baseline and leaves the x in place.
+
+## Commands
+
+These commands take no arguments. Select text to change its formatting, or place the caret where you want to start typing. `editor.run` returns `Result<CommandOutcome, Error>`. A handled command returns `Applied(AppliedChange)`. Set and toggle return `NotApplicable` if no text can take the mark.
+
+### `setSuperscript`
+
+Apply superscript to the selection or to the next characters typed at the caret.
+
+```rust
+editor.run(gpdoc_plugin_superscript::Set)?;
+```
+
+### `toggleSuperscript`
+
+Switch superscript off when the whole eligible selection has the mark. On a mixed selection, apply it throughout.
+
+```rust
+editor.run(gpdoc_plugin_superscript::Toggle)?;
+```
+
+### `unsetSuperscript`
+
+Clear superscript from the selection or turn it off for subsequent typing.
+
+```rust
+editor.run(gpdoc_plugin_superscript::Unset)?;
+```
+
+## Keyboard shortcuts
+
+Toggle superscript with **Command + .** on macOS or **Ctrl + .** on Windows and Linux.
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-superscript`. In a GPUI editor, `superscript()` raises marked text above the baseline. To supply your own formatter, import `gpdoc::PluginViewExt` and register `superscript().with_view(my_superscript_view)`.

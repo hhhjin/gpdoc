@@ -1,0 +1,86 @@
+---
+title: Unique ID
+description: Assign stable IDs to selected node types when a document opens or changes.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Unique ID gives nodes identifiers you can use for comments, links, or selection in your app. When you paste a copy of an existing node, the copy gets a new ID.
+
+## Try it
+
+<PluginExample plugin="unique-id" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-unique-id
+```
+
+## Assign IDs to paragraphs
+
+With the paragraph plugin installed, assign UUIDs to paragraphs when the document opens.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node, Value};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_unique_id::unique_id;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(unique_id(["paragraph"]))
+    .build()?;
+let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Release notes")])?;
+let id = editor.document().blocks()[0].attrs.get("id");
+assert!(matches!(id, Some(Value::String(id)) if !id.is_empty()));
+```
+
+## Settings
+
+### Named node types
+
+Pass the registered type names to `unique_id` to generate UUID v4 strings in the `id` attribute. New or copied nodes get distinct IDs. When an unchanged original and a new copy share an ID, the original keeps it.
+
+```rust
+let ids = unique_id(["paragraph"]);
+```
+
+### All node types
+
+Use `unique_id_all()` to assign IDs to every type except the document root and text. This also covers nested nodes.
+
+```rust
+use gpdoc_plugin_unique_id::unique_id_all;
+
+let ids = unique_id_all();
+```
+
+### Attribute name and generator
+
+Use `unique_id_with(types, attribute, generate)` for a custom attribute and generator. The callback receives `(&Node, DocPos)` and must return a unique `String`. Duplicate generated IDs cause an edit error. Choose values that stay unique across all documents you intend to merge.
+
+```rust
+use gpdoc_plugin_unique_id::unique_id_with;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+let next = AtomicUsize::new(1);
+let ids = unique_id_with(["paragraph"], "blockId", move |_, _| {
+	format!("draft-{}", next.fetch_add(1, Ordering::Relaxed))
+});
+```
+
+### Read-only documents
+
+Use `configured_ids` with `update_document` set to `false` to declare a nullable string attribute and preserve existing IDs. The generator is unused in this mode. Choose `IdTargets::All` or `IdTargets::Named(Vec<String>)`.
+
+```rust
+use gpdoc_plugin_unique_id::{configured_ids, IdTargets};
+
+let ids = configured_ids(IdTargets::All, "id", false, |_, _| String::new());
+```
+
+## Source code
+
+[unique-id/src/lib.rs](/source/plugins/unique-id/src/lib.rs.txt)

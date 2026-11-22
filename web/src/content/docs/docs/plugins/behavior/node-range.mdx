@@ -1,0 +1,40 @@
+---
+title: Node range
+description: Select whole sibling blocks with the keyboard or a modifier drag.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+`node_range()` selects whole blocks that share a parent.
+
+## Try it
+
+Click “Draft the outline” and press **Shift + Down Arrow** to select the whole paragraph.
+Press it again to include “Review the draft”. Press **Shift + Up Arrow** to shrink the selection back to the first paragraph.
+
+<ViewPluginExample plugin="node-range" title="Node range example" />
+
+You can also hold Command on macOS or Control on Windows and Linux while dragging across two paragraphs. Release the mouse button while holding the key to select both blocks.
+
+## Register the plugin
+
+In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register its input handler with the editor.
+
+```sh
+cargo add gpdoc-plugin-node-range
+```
+
+```rust
+use gpdoc_plugin_node_range::node_range;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(gpdoc_plugin_paragraph::paragraph())
+    .plugin(node_range())
+    .build()?;
+```
+
+With a [drag handle](/docs/plugins/behavior/drag-handle/) installed, dragging a handle inside the selected range moves the blocks together.
+
+## Source code
+
+[node-range/src/lib.rs](/source/plugins/node-range/src/lib.rs.txt)

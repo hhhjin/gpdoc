@@ -1,0 +1,124 @@
+---
+title: Plugins
+description: Browse gpdoc plugins by feature and find install commands and Rust examples.
+tableOfContents: false
+---
+
+import PluginCatalog from "../../../components/PluginCatalog.astro";
+import ParagraphExample from "../../../components/ParagraphExample.astro";
+
+Choose a plugin for install commands and Rust examples. Pages with a browser demo let you try the behavior in place. The source links open the Rust implementation used to build these docs. Set up a Cargo project in the [Quickstart](/docs/quickstart/#create-a-rust-project).
+
+<PluginCatalog />
+
+## Register a plugin
+
+Register plugins before opening a document. Use `gpdoc::EditorConfig::builder()` to register plugins, then pass the configuration to an editor constructor. A plugin can define a node, a mark, a command, a shortcut, or a rule that runs as you type. The engine provides the `doc` and `text` types. Add [Paragraph](/docs/plugins/structure/paragraph/) for the default text block.
+
+If a snippet uses an existing `editor`, register the required plugins in an `EditorConfig` and place the snippet inside `main` after creating the editor. For examples that call a codec or collaboration API, use `Result<(), Box<dyn std::error::Error>>` as the return type of `main`.
+
+### Register GPUI views
+
+In the [Quickstart app](/docs/quickstart/#configure-the-editor), add [Placeholder](/docs/plugins/behavior/placeholder/) and [Gap cursor](/docs/plugins/behavior/gap-cursor/). Register each plugin to use its default GPUI behavior.
+
+```sh
+cargo add gpdoc-plugin-placeholder gpdoc-plugin-gap-cursor
+```
+
+```rust
+use gpdoc_plugin_gap_cursor::gap_cursor;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_placeholder::placeholder;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(placeholder("Write an update…"))
+    .plugin(gap_cursor())
+    .build()?;
+```
+
+An empty paragraph shows the writing hint. In a document with adjacent closed blocks, click their boundary to place the gap cursor. To change how a plugin looks, define a view in your application and register it with `.with_view(...)`. See [Style a paragraph](/docs/quickstart/#style-a-paragraph) and [Register your slash commands](/docs/plugins/behavior/slash-command/#register-your-commands).
+
+## Format a selection
+
+<ParagraphExample />
+
+From your [Quickstart project](/docs/quickstart/), add the two formatting plugins.
+
+```sh
+cargo add gpdoc-plugin-bold gpdoc-plugin-italic
+```
+
+Replace `src/main.rs` with this example and run `cargo run`. The program prints the marks attached to `release notes`.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_bold::bold;
+use gpdoc_plugin_italic::italic;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(bold())
+	    .plugin(italic())
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text(
+		"paragraph",
+		"Give the release notes a little emphasis.",
+	)])?;
+
+	editor.select(Selection::Text {
+		anchor: DocPos(10),
+		head: DocPos(23),
+	})?;
+	editor.run(gpdoc_plugin_bold::Toggle)?;
+	editor.run(gpdoc_plugin_italic::Toggle)?;
+
+	let (_, phrase) = editor
+		.document()
+		.iter_nodes()
+		.find(|(_, node)| node.projected_text() == "release notes")
+		.expect("the selected phrase has its own text node");
+	for mark in phrase.marks() {
+		println!("{}", mark.kind);
+	}
+	Ok(())
+}
+```
+
+```text
+bold
+italic
+```
+
+## Commands
+
+Pass a command value exported by the plugin to `editor.run(command)`. Its Rust type specifies the arguments.
+
+| Result from `editor.run` | Meaning |
+| --- | --- |
+| `Ok(CommandOutcome::Applied(change))` | The editor applied the command's transaction and returned an `AppliedChange`. |
+| `Ok(CommandOutcome::NotApplicable)` | The command declined the current selection or arguments. The editor stays as it was. |
+| `Err(Error::UnknownCommand(name))` | Register the plugin that handles this command type. |
+| Other `Err(error)` | Planning or applying the transaction failed. The error describes the cause. |
+
+When wiring a toolbar button, pass its command value to `editor.can(command)`. It checks the proposed edit without applying it and returns `Result<bool, Error>`. Use `Ok(false)` to disable the button for the current selection.
+
+The editor has built-in local undo and redo. Use `editor.undo()` and `editor.redo()` to move through the history.
+
+<span id="custom-plugins"></span>
+
+## Build a plugin
+
+[Create your first plugin](/docs/plugins/custom/first-plugin/) to build and test a caption block. Then choose a guide for the feature you want to add.
+
+| To add | Guide |
+| --- | --- |
+| A document type, a formatting mark, or a validated field | [Nodes, marks, and attributes](/docs/plugins/custom/schema/) |
+| An editing action with a keyboard binding | [Commands and shortcuts](/docs/plugins/custom/commands/) |
+| A value that an editor remembers between commands | [Transactions and plugin state](/docs/plugins/custom/state/) |
+| A conversion triggered by typing or pasting | [Input and paste rules](/docs/plugins/custom/input-and-paste/) |
+| A native renderer for an editable block | [Render a plugin in GPUI](/docs/plugins/custom/gpui/) |
+
+For signatures and hook behavior, see the [Plugin API reference](/docs/plugins/custom/api/).

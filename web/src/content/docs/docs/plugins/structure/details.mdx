@@ -1,0 +1,114 @@
+---
+title: Details
+description: Wrap blocks in a disclosure with an editable summary.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`details()` groups a summary and a body that the editor view can expand or collapse. Use it for notes readers can open when they need them.
+
+## Try it
+
+<PluginExample plugin="details" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-details
+```
+
+Register `details()` to install the disclosure node and its two child types. The summary holds text. The body holds one or more blocks.
+
+## Wrap a paragraph and give it a summary
+
+In a [Quickstart project](/docs/quickstart/), install the details plugin. Wrap a paragraph, then type the summary at the new caret.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_details::details;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(details())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "The full change log.")])?;
+editor.run(gpdoc_plugin_details::Set)?;
+editor.insert_text("Release details")?;
+
+let summary = Node::text("detailsSummary", "Release details");
+assert!(editor.document().iter_nodes().any(|(_, node)| *node == summary));
+```
+
+## Settings
+
+### `details_with_persistence`
+
+With `details()`, each editor view owns the expanded state. To save that state in the document, register `details_with_persistence(true)`. This adds the boolean node attribute `open`, which defaults to `false`.
+
+```rust
+use gpdoc::EditorConfig;
+use gpdoc_plugin_details::details_with_persistence;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(details_with_persistence(true))
+    .build()?;
+```
+
+## Compose a GPUI disclosure
+
+With the `gpui` feature, `details()` places a clickable disclosure arrow beside the editable summary and installs folding and keyboard navigation. Attach a view when you want a custom header.
+
+```rust
+use gpdoc::PluginViewExt;
+use gpdoc_plugin_details::details;
+use gpdoc_plugin_paragraph::paragraph;
+
+mod views;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(details().with_view(views::disclosure_header))
+    .build()?;
+```
+
+In `views.rs`, place the trigger beside the editable summary. The trigger toggles the fold. The details plugin keeps the selection and keyboard navigation in sync with the visible body.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_details::disclosure;
+use gpui::{div, prelude::*, px};
+
+pub fn disclosure_header() -> ViewPlugin {
+    disclosure(|header, _, _| {
+        div().flex().gap(px(8.))
+            .child(header.trigger.child(if header.open { "−" } else { "+" }))
+            .child(div().flex_1().min_w_0().child(header.content))
+    })
+}
+```
+
+Use `disclosure(DetailsSummary::render)` with `DetailsSummary` from the details crate for a disclosure arrow with a fixed-width control. To decorate the opened body, call `.wrap_node("detailsContent", ...)` on the returned view and wrap the supplied editable content.
+
+## Commands
+
+### `setDetails`
+
+Wrap selected sibling blocks when the body accepts them and their parent permits a disclosure. The editor moves the caret to the new, empty summary so the next text you type becomes its label.
+
+```rust
+editor.run(gpdoc_plugin_details::Set)?;
+```
+
+### `unsetDetails`
+
+With a text selection wholly inside one disclosure, convert its summary to the parent’s default block type and place the body blocks after it. The caret returns to the start of the former summary.
+
+```rust
+editor.run(gpdoc_plugin_details::Unset)?;
+```
+
+## Source code
+
+[details/src/lib.rs](/source/plugins/details/src/lib.rs.txt)

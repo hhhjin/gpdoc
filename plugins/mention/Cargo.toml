@@ -1,0 +1,22 @@
+[package]
+name = "gpdoc-plugin-mention"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Mention plugin for the gpdoc rich-text editor"
+
+[features]
+gpui = ["dep:gpdoc", "gpdoc-plugin-suggestion/gpui", "dep:gpui", "dep:gpui-browser"]
+
+[dependencies]
+gpdoc = { workspace = true, features = ["gpui"], optional = true }
+gpdoc-plugin.workspace = true
+gpdoc-plugin-suggestion.workspace = true
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+gpui = { workspace = true, optional = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpui-browser = { workspace = true, optional = true }

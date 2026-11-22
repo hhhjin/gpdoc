@@ -1,0 +1,53 @@
+---
+title: Bubble menu
+description: Show a contextual menu above a selection.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Drag across “the headline” to show the menu above the selection. Click a word to hide it.
+
+<ViewPluginExample plugin="bubble-menu" title="Bubble menu example" />
+
+## Register the plugin
+
+Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
+
+```sh
+cargo add gpdoc-plugin-bubble-menu
+```
+
+`.plugin(bubble_menu())` reserves the menu name. Attach a view to supply its contents and open it when the selection matches.
+
+```rust
+use gpdoc_plugin_bubble_menu::bubble_menu;
+use gpdoc_plugin_paragraph::paragraph;
+
+mod menus;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(bubble_menu().with_view(menus::bubble_menu))
+    .build()?;
+```
+
+In `menus.rs`, compose the contents with GPUI elements. The function receives the editor entity so controls can run commands. The plugin positions the result above the selection and keeps keyboard focus in the editor.
+
+```rust
+use gpdoc::EditorView;
+use gpui::{App, Entity, Window, div, prelude::*};
+
+pub fn bubble_menu(_: Entity<EditorView>, _: &mut Window, _: &mut App) -> gpui::Div {
+    div().child("Selected text")
+}
+```
+
+Select a word to display the menu above it. Collapsing the selection to a caret hides the menu.
+
+Use `.named("linkMenu").show_when(|editor| editor.editor().mark_active("link").unwrap_or(false))` before `.with_view(...)` to register a second menu for links. Each menu needs a unique name. See [Floating menu](/docs/plugins/behavior/floating-menu/) for a caret in an empty paragraph.
+
+## Source code
+
+[bubble-menu/src/lib.rs](/source/plugins/bubble-menu/src/lib.rs.txt)

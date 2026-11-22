@@ -1,0 +1,80 @@
+---
+title: Paragraph
+description: Add the default text block to an editor.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`paragraph()` registers the text block most documents start with. A paragraph can contain text, marks, and inline nodes such as mentions, depending on the rest of your schema.
+
+## Try it
+
+<PluginExample plugin="paragraph" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-paragraph
+```
+
+Register `paragraph()` in your editor configuration. This makes `paragraph` the default text block. It has no attributes and accepts zero or more inline children.
+
+## Open a document with one paragraph
+
+Open a document with one paragraph in your [Quickstart project](/docs/quickstart/).
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .build()?;
+let block = Node::text("paragraph", "Write here.");
+let mut editor = Editor::from_document(&config, vec![block.clone()])?;
+assert_eq!(editor.document().blocks(), &[block]);
+```
+
+For an empty editor, pass `Node::text("paragraph", "")` as the first block.
+
+## Commands
+
+### `setParagraph`
+
+Convert the text block at the caret, or selected text blocks, to body text wherever their parent permits a paragraph. The conversion keeps supported inline content and marks. A gap selection supplies no blocks to convert.
+
+```rust
+editor.run(gpdoc_plugin_paragraph::Set)?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Mod + Alt + 0** | Convert selected text blocks to paragraphs. |
+
+## Compose a GPUI view
+
+Paragraphs inherit the editor’s typography by default. To customize the layout, enable `gpui` on `gpdoc-plugin-paragraph` and attach a view using `gpdoc::PluginViewExt`.
+
+```rust
+.plugin(paragraph().with_view(views::paragraph))
+```
+
+In `views.rs`, place the editable content once. The wrapper sets the base typography for its editable text.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_paragraph::paragraph_block;
+use gpui::{div, prelude::*, px};
+
+pub fn paragraph() -> ViewPlugin {
+    paragraph_block(|block, _, _| {
+        div().text_size(px(16.)).line_height(px(26.)).child(block.content)
+    })
+}
+```
+
+## Source code
+
+[paragraph/src/lib.rs](/source/plugins/paragraph/src/lib.rs.txt)

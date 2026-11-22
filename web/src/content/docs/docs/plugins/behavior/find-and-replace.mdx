@@ -1,0 +1,193 @@
+---
+title: Find and replace
+description: Highlight, navigate, and replace matching text in a document.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Register Find and replace to power a search bar or a bulk text edit. Searches span adjacent marked text within a block, so formatting inside a word does not split the match.
+
+## Try it
+
+<PluginExample plugin="find-and-replace" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-find-and-replace
+```
+
+## Replace every occurrence of a word
+
+Register `find_and_replace()` and `paragraph()` in the editor config. Open a paragraph containing `draft and draft`, then replace both matches.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_find_and_replace::{find_and_replace, results, ReplaceAll, SetReplaceTerm, SetSearchTerm};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(find_and_replace())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "draft and draft")])?;
+
+editor.run(SetSearchTerm("draft".into()))?;
+assert_eq!(results(&editor).ranges.len(), 2);
+
+editor.run(SetReplaceTerm("final".into()))?;
+editor.run(ReplaceAll)?;
+assert_eq!(
+	editor.document().blocks(),
+	[Node::text("paragraph", "final and final")],
+);
+```
+
+## Highlight matches in GPUI
+
+Enable the `gpui` feature on `gpdoc-plugin-find-and-replace`. The GPUI configuration installs the default highlight when you register the plugin.
+
+```rust
+use gpdoc::EditorConfig;
+use gpdoc_plugin_find_and_replace::find_and_replace;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(find_and_replace())
+    .build()?;
+```
+
+Use `find_and_replace().with_view(|| search_highlights(your_painter))` to change the highlight. Your painter receives a `MatchHighlight` for each visible fragment with the committed document range, measured bounds and current-result flag. The plugin caches search results and maps them through wrapping, bidirectional text and IME composition. It paints highlights above mark backgrounds and below the native selection.
+
+## Settings
+
+### Search across blocks
+
+The default plugin searches one text block at a time. In `find_and_replace_with`, returning `true` for a block lets its text continue the preceding block for both search and replacement.
+
+```rust
+use gpdoc_plugin_find_and_replace::find_and_replace_with;
+
+let plugin = find_and_replace_with(|block| block.kind == "paragraph");
+```
+
+## Commands
+
+### setSearchTerm
+
+Set `term` to a string. An empty query clears the matches.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::SetSearchTerm("draft".into()))?;
+```
+
+### setReplaceTerm
+
+Set `term` to the literal replacement string. The default empty string deletes the matched text.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::SetReplaceTerm("final".into()))?;
+```
+
+### setCaseSensitive
+
+Matching ignores case by default. Set `caseSensitive` to `true` to distinguish `Draft` from `draft`.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::SetCaseSensitive(true))?;
+```
+
+### setWholeWord
+
+Set `wholeWord` to `true` to match complete words in a literal search. The default is `false`. In regex mode, include word boundaries in the pattern itself.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::SetWholeWord(true))?;
+```
+
+### setUseRegex
+
+Set `useRegex` to `true` to interpret the query as a Rust regular expression. The default is literal matching. Invalid patterns yield no matches.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::SetUseRegex(true))?;
+```
+
+### goToNextResult
+
+Select the first match on the first call. Subsequent calls advance and wrap to the beginning.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::GoToNextResult)?;
+```
+
+### goToPreviousResult
+
+Select the first match on the first call. Subsequent calls move backward and wrap to the last result.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::GoToPreviousResult)?;
+```
+
+### replace
+
+Replace the current match, or the first if you have not navigated yet. The next remaining match becomes selected.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::Replace)?;
+```
+
+### replaceAll
+
+Replace every match in one transaction.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::ReplaceAll)?;
+```
+
+### clearSearch
+
+Clear the search term, highlights, and current index while preserving the replacement text and matching options.
+
+```rust
+editor.run(gpdoc_plugin_find_and_replace::ClearSearch)?;
+```
+
+## Read matches
+
+### results
+
+Call `results(&editor)` to read a `SearchResults` value from the find-and-replace plugin. Its `ranges` are document positions with exclusive ends. Its `current` field is the zero-based index of the active match. A new query starts at the first match. An empty result has `current: None`. A custom view can use this index to emphasize it.
+
+```rust
+let matches = results(&editor);
+let active = matches.current.and_then(|index| matches.ranges.get(index));
+```
+
+### search
+
+Run an independent query against a document. `SearchOptions` defaults to an empty `term: String` and `false` for `case_sensitive`, `whole_word`, and `use_regex`.
+
+```rust
+use gpdoc_plugin_find_and_replace::{search, SearchOptions};
+
+let options = SearchOptions { term: "draft".into(), ..Default::default() };
+let matches = search(editor.document(), &options);
+```
+
+### search_with
+
+Pass a continuation predicate to the standalone search. It returns document ranges using the same rules as the configured plugin.
+
+```rust
+use gpdoc_plugin_find_and_replace::search_with;
+
+let matches = search_with(editor.document(), &options, |block| block.kind == "paragraph");
+```
+
+## Source code
+
+[find-and-replace/src/lib.rs](/source/plugins/find-and-replace/src/lib.rs.txt)

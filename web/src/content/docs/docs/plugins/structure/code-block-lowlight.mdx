@@ -1,0 +1,105 @@
+---
+title: Code block with syntax highlighting
+description: Color code blocks while preserving their plain-text source.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`code_block_lowlight()` colors code using bundled syntax definitions and a light theme. Its tokens affect rendering. Saved documents contain the ordinary `codeBlock` node.
+
+## Try it
+
+<PluginExample plugin="code-block-lowlight" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-code-block-lowlight gpdoc-plugin-code-block
+```
+
+Register `code_block_lowlight()` alongside `paragraph()`. It supplies the code-block node, commands, and a highlighter that uses the InspiredGitHub theme.
+
+## Inspect the colors for Rust source
+
+In a [Quickstart project](/docs/quickstart/), register the highlighted code block and inspect the color tokens for Rust source.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_code_block::Language;
+use gpdoc_plugin_code_block_lowlight::code_block_lowlight;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(code_block_lowlight())
+    .build()?;
+let source = "fn main() {}";
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", source)])?;
+editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
+
+let block = &editor.document().blocks()[0];
+assert!(!config.presentation().syntax_tokens(block, source).is_empty());
+```
+
+## Settings
+
+### `language`
+
+A new block defaults to null. Use `Language::Set(name)` to look up a language or `Language::Clear` to clear it. If the bundled highlighter cannot match the name, it tries the first line of source, such as a shebang. Unrecognized source stays plain.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
+```
+
+### `code_block_with_highlighter`
+
+Register a custom highlighter in place of the bundled one. The callback receives `Option<&str>` for the language and `&str` for the source. It returns a `Vec<SyntaxToken>` and must implement `Fn + Send + Sync + 'static`. This example gives an entire nonempty shell block one color.
+
+```rust
+use gpdoc::{EditorConfig, SyntaxToken};
+use gpdoc_plugin_code_block_lowlight::code_block_with_highlighter;
+
+let code = code_block_with_highlighter(|language, source| {
+    if language == Some("sh") && !source.is_empty() {
+        vec![SyntaxToken { bytes: 0..source.len(), color: [48, 120, 72, 255] }]
+    } else {
+        Vec::new()
+    }
+});
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(code)
+    .build()?;
+```
+
+## Commands
+
+### `setCodeBlock`
+
+Convert eligible text blocks to code. `Language::Keep` preserves the language when updating a single existing block.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Set(Language::Keep))?;
+```
+
+### `toggleCodeBlock`
+
+Switch to paragraphs when every selected block is code and matches the supplied attributes. `Language::Keep` matches any code-block language. Otherwise, convert eligible text blocks to code.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Toggle(Language::Keep))?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Mod + Alt + C** | Toggle code formatting for the selected blocks. |
+
+## Render highlighted text
+
+Call `config.presentation().syntax_tokens(block, text)` with the exact source you draw. Each token’s `bytes` range indexes that UTF-8 source. Its `color` contains four sRGB and alpha bytes. The colors belong to the view, so the document continues to store plain source.
+
+## Source code
+
+[code-block-lowlight/src/lib.rs](/source/plugins/code-block-lowlight/src/lib.rs.txt)

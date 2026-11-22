@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gpdoc playground</title>
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body>
+    <p id="editor-status" role="status">Loading editor…</p>
+    <noscript>Enable JavaScript to open the editor.</noscript>
+    <script>
+      const status = document.getElementById("editor-status");
+      try {
+        const { default: init, start, start_view_example } = await import("../generated/gpdoc-editor.js");
+        await init();
+        const host = window.frameElement;
+        const viewExample = host?.getAttribute("data-view-example");
+        if (viewExample) {
+          if (viewExample === "file-handler") {
+            const result = document.createElement("output");
+            result.id = "paste-result";
+            document.body.append(result);
+          }
+          start_view_example(viewExample);
+        } else {
+          start();
+        }
+        status?.remove();
+      } catch (error) {
+        if (status) status.textContent = "Could not start the gpdoc editor. Reload to try again.";
+        console.error(error);
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font: 1rem system-ui, sans-serif;
+  }
+
+  #paste-result {
+    position: fixed;
+    bottom: 1rem;
+    left: 2.5rem;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  #editor-status, noscript {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  noscript {
+    background: white;
+  }
+</style>

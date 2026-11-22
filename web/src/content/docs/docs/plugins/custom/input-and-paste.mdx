@@ -1,0 +1,80 @@
+---
+title: Input and paste rules
+description: Turn a paragraph into a caption when someone types or pastes a marker and verify the undo behavior.
+---
+
+Give the [caption plugin](/docs/plugins/custom/first-plugin/) a typing shortcut. At the start of a paragraph, typing `>` followed by a space will remove the marker and turn the paragraph into a caption. For paste, support the same conversion when the clipboard contains exactly the two-character marker.
+
+## Register the rules
+
+Run `cargo add regex` in the plugin crate. Create `src/rules.rs`.
+
+```rust
+use gpdoc_plugin::prelude::*;
+use gpdoc_plugin::textblock::textblock_type_input_rule;
+use regex::Regex;
+
+pub fn caption_rules(p: &mut PluginSpec) {
+    let marker = || {
+        textblock_type_input_rule(
+            Regex::new(r"^> $").expect("valid caption marker"),
+            "paragraph",
+            "caption",
+            |_| Some(Attrs::new()),
+        )
+    };
+    p.input_rule(marker());
+
+    let pasted_marker = marker();
+    p.paste_rule(move |ctx| {
+        let range = &ctx.inserted;
+        let pasted = ctx.document.root().text_between(range.start.0, range.end.0, "\n", "\u{fffc}")?;
+        if pasted != "> " {
+            return Ok(Vec::new());
+        }
+        Ok(pasted_marker(ctx)?.unwrap_or_default())
+    });
+}
+```
+
+Add `mod rules;` to `src/lib.rs` and call `rules::caption_rules(p);` inside the existing `Plugin::new("caption", |p| { ... })` closure.
+
+After typing, the text-block helper checks the text from the paragraph start to the caret. A matching prefix produces edits that remove the marker and change the block type. Any text after the caret stays in the block.
+
+Pasting uses a separate hook. After the editor inserts the clipboard text, `ctx.inserted` covers the inserted range. The paste rule checks that range before running the same conversion. Pasting a whole line such as `> Figure 1` leaves the line intact. Use `handle_paste` if you need to take over before the editor inserts anything.
+
+## Check typing, paste, and undo
+
+Create `tests/rules.rs`.
+
+```rust
+use gpdoc::{Editor, EditorConfig};
+use gpdoc_plugin::prelude::*;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_writing::caption;
+
+#[test]
+fn convert_a_caption_marker() -> Result<(), Error> {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(caption())
+        .build()?;
+    let mut editor = Editor::from_config(&config)?;
+    editor.insert_text(">")?;
+    editor.insert_text(" ")?;
+    assert_eq!(editor.document().blocks()[0].kind, "caption");
+    editor.undo()?;
+    assert_eq!(editor.document().blocks(), [Node::text("paragraph", ">")]);
+
+    let mut editor = Editor::from_config(&config)?;
+    editor.paste_text("> ")?;
+    assert_eq!(editor.document().blocks()[0].kind, "caption");
+    editor.undo()?;
+    assert_eq!(editor.document().blocks(), [Node::text("paragraph", "")]);
+    editor.paste_text("> Figure 1")?;
+    assert_eq!(editor.document().blocks(), [Node::text("paragraph", "> Figure 1")]);
+    Ok(())
+}
+```
+
+Run `cargo test --test rules`. Undo after typing restores the paragraph as it was before the space. Undo after pasting removes the entire paste.

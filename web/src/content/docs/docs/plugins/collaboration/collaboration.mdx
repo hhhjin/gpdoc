@@ -1,0 +1,147 @@
+---
+title: Collaboration
+description: Synchronize editor documents by exchanging Yjs-compatible updates.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`Collaboration` lets two editors work on the same document. Each editor can accept edits while it is offline. When the peers exchange Yjs-compatible updates, both see the merged document.
+
+## Try it
+
+<PluginExample plugin="collaboration" />
+
+## Install
+
+The example uses the editor engine and the paragraph plugin from the [Quickstart](/docs/quickstart/). Add the collaboration crate to that project.
+
+```sh
+cargo add gpdoc-plugin-collaboration
+```
+
+## Connect a GPUI view
+
+Enable the view binding with `cargo add gpdoc-plugin-collaboration --features gpui`. Import `CollaborationView` alongside `Collaboration` to bind a session to an existing `Editor`.
+
+```rust
+use gpdoc_plugin_collaboration::{Collaboration, CollaborationView};
+
+let session = Collaboration::new(view.editor().fork(), "default")?;
+view.bind_collaboration(session, send_update, window, cx)?;
+```
+
+The app's `send_update` function sends the encoded bytes to other peers. Deliver incoming bytes with `view.receive_collaboration_update(update, window, cx)?`. The binding queues incoming updates during IME composition. Undo and redo use the local peer's collaboration history.
+
+## Open a shared document
+
+The next three snippets form a two-peer example. Add these imports to `src/main.rs`, then put the snippets inside `main` before `Ok(())`.
+
+```rust
+use gpdoc_plugin::core::{DocPos, Node, Selection};
+use gpdoc_plugin_collaboration::{Collaboration, StateVector};
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+	// Add the three snippets here.
+	Ok(())
+}
+```
+
+### `new` and `from_update`
+
+Seed the document once. `new` takes ownership of Alice's editor and creates a named XML fragment. Bob joins by passing the full update to `from_update`. Both use the same fragment name and a config that recognizes the document's nodes and marks.
+
+```rust
+use gpdoc::{Editor, EditorConfig};
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .build()?;
+let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi")])?;
+let mut alice = Collaboration::new(editor, "default")?;
+
+let seed = alice.update_since(&StateVector::default());
+let mut bob = Collaboration::from_update(&config, "default", &seed)?;
+```
+
+## Send an edit to another peer
+
+### `select`, `edit`, and `apply_update`
+
+Place Alice's caret after `Hi`, then insert an exclamation mark. `edit` runs the closure atomically and returns its result alongside the encoded update. In an app, send those bytes through your transport. Here Bob receives them directly. `apply_update` validates and merges the update, and `editor` borrows Bob's current editor so you can read the result.
+
+```rust
+alice.select(Selection::caret(DocPos(3)))?;
+let (_, update) = alice.edit(|editor| editor.insert_text("!"))?;
+bob.apply_update(&update)?;
+assert_eq!(bob.editor().document().blocks(), [Node::text("paragraph", "Hi!")]);
+```
+
+### `undo` and `redo`
+
+Each session keeps its own edit history. Send an undo or redo update to peers just like an edit. An empty history returns `Error::Editor(gpdoc_plugin::core::Error::NoHistory)` from the collaboration crate.
+
+```rust
+bob.apply_update(&alice.undo()?)?;
+assert_eq!(bob.editor().document().blocks(), [Node::text("paragraph", "Hi")]);
+bob.apply_update(&alice.redo()?)?;
+assert_eq!(bob.editor().document().blocks(), [Node::text("paragraph", "Hi!")]);
+```
+
+Run `cargo run`. All three assertions pass silently.
+
+## Work with a fork of the session
+
+### `editor` and `record`
+
+If your view edits a fork, call `record` with that editor when the edit commits. It returns update bytes when the document changes and `None` when the document stays the same. If the session has moved on since the fork, it can return a stale revision error. Start subsequent edits from the current session editor.
+
+```rust
+let mut view_editor = alice.editor().fork();
+view_editor.insert_text(" Ready.")?;
+if let Some(update) = alice.record(&view_editor)? {
+	bob.apply_update(&update)?;
+}
+```
+
+### `relative_selection` and `resolve_selection`
+
+Pin the current selection when you need to find it after an edit. `relative_selection` returns an optional `RelativeSelection`. Resolve it against the updated session to get current document positions. Either operation can return `None` if the positions cannot be represented.
+
+```rust
+if let Some(pin) = alice.relative_selection() {
+	let (_, update) = alice.edit(|editor| editor.insert_text(" Later."))?;
+	bob.apply_update(&update)?;
+	if let Some(selection) = alice.resolve_selection(&pin) {
+		alice.select(selection)?;
+	}
+}
+```
+
+### `awareness`
+
+For custom presence, create a Yrs awareness instance with the session's client ID. To display other users' names and selections, use [Collaboration caret](/docs/plugins/collaboration/collaboration-caret/).
+
+```rust
+let awareness = alice.awareness();
+let local_client = awareness.client_id();
+println!("Presence client: {local_client}");
+```
+
+## Catch up after working offline
+
+### `state_vector` and `update_since`
+
+Each peer's state vector records the changes it already has. Pass the receiver's vector to the sender's `update_since` to encode the missing changes. When both peers edit offline, exchange updates in both directions. Your app supplies the transport and persistence for these document updates.
+
+```rust
+let for_bob = alice.update_since(&bob.state_vector());
+let for_alice = bob.update_since(&alice.state_vector());
+bob.apply_update(&for_bob)?;
+alice.apply_update(&for_alice)?;
+```
+
+## Source code
+
+- [collaboration/src/lib.rs](/source/plugins/collaboration/src/lib.rs.txt)
+- [collaboration/src/position.rs](/source/plugins/collaboration/src/position.rs.txt)
+- [collaboration/src/tree.rs](/source/plugins/collaboration/src/tree.rs.txt)

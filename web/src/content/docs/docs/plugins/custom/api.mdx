@@ -1,0 +1,137 @@
+---
+title: Plugin API reference
+description: Signatures and behavior for defining a Rust plugin, registering commands, updating state, and attaching a view.
+---
+
+A plugin declares document types, commands, or editing rules. Use `gpdoc_plugin::prelude` for common authoring types and `gpdoc_plugin::core` for engine types. For a working example, see [Create your first plugin](/docs/plugins/custom/first-plugin/).
+
+Import `gpdoc_plugin::EditorConfig` to build a headless editor with the plugin toolkit. In a GPUI application, import `gpdoc::EditorConfig` to register views and open an editor entity.
+
+## Plugin declarations
+
+`Plugin::new(name, declare)` calls `declare` with a mutable `PluginSpec`. Register as many nodes, marks, or commands as the feature needs. Options are ordinary arguments to the function that constructs the plugin. An independent preset can return a `Vec<Plugin>`.
+
+```rust
+use gpdoc::EditorConfig;
+use gpdoc_plugin::prelude::*;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn aside() -> Plugin {
+    Plugin::new("aside", |p| {
+        p.node(NodeSpec::block("aside").group("block").content("block+"));
+    })
+}
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(aside())
+    .build()?;
+```
+
+`Plugin::name()` returns the registration name. `.priority(n)` sets priority, which defaults to 100. Higher numbers run first. Within one priority, the config installs schema declarations in order and tries later plugins first for input rules, paste, and shortcuts.
+
+`EditorConfig` checks schema and command references across the complete set of plugins. A config needs one default text block. Register each plugin and each command type once.
+
+## Schema and presentation
+
+| Type | Declaration |
+| --- | --- |
+| `NodeSpec` | `block(name)`, `inline(name)`, and `new(name, placement)` create ungrouped leaves. Use `group(name)` to add a group, `content(spec)` to declare children, and `attrs(specs)` to set attributes. For example, a top-level paragraph typically uses `group("block").content("inline*")`. |
+| `MarkSpec` | `new(name)` creates an inclusive mark that excludes its own type. Use `group(name)`, `attrs(specs)`, `excludes(expression)`, and `inclusive_end(bool)` to change its behavior. In an exclusion expression, `_` excludes all marks and the empty string permits distinct marks of the same type. |
+| `ContentSpec` | Use `Leaf`, `LineBreak`, or `expression(content)`. To specify allowed marks, use `with_marks(content, marks)`, `inline(marks)` for `inline*`, or `text(marks)` for `text*`. Pass `AllowedMarks::All` or `AllowedMarks::Only(Vec<String>)`. |
+| `AttrSpecs` | Maps field names to `AttrSpec::required(kind)`, `optional(kind)`, or `with_default(kind, value)`. The supported `AttrType` values are `Json`, `NullableString`, `String`, `Integer`, and `Bool`. |
+
+Register declarations on the `PluginSpec` passed to your closure.
+
+| Method | Effect |
+| --- | --- |
+| `p.node(spec)`, `p.mark(spec)` | Add a node or mark to the schema. Each specification carries its own type name. |
+| `p.default_text_block(name)` | Set the fallback text block. It must allow empty content and have no required attributes. |
+| `p.document_content(expression)` | Set the root content expression. The default is `block+`. |
+| `p.attributes(targets, attrs)` | Extend installed types by name with `AttributeTargets::names(names)`, or extend matching nodes with `AttributeTargets::nodes(predicate)`. Conflicting definitions of the same attribute fail config validation. |
+| `p.selection(behavior)` | Register a custom selection's validation, range calculation, mapping, and input behavior under this plugin's name. |
+| `p.metadata(value)` | Attach typed integration data, such as a Markdown codec. Inspect matching metadata with `EditorConfig::plugin_data::<T>()`. |
+| `p.syntax_highlighter(kind, highlight)` | Supply syntax tokens in ascending order, with disjoint UTF-8 byte ranges. |
+
+## Commands and keyboard shortcuts
+
+Define a struct for each command and implement `Command` for it. The handler receives the command value and a `CommandContext`.
+
+```rust
+use gpdoc_plugin::prelude::*;
+
+#[derive(Clone)]
+pub struct InsertGreeting {
+    pub text: String,
+}
+
+impl Command for InsertGreeting {
+    const NAME: &'static str = "insertGreeting";
+}
+
+fn greetings() -> Plugin {
+    Plugin::new("greetings", |p| {
+        p.command::<InsertGreeting>(|ctx, InsertGreeting { text }| {
+            let range = ctx.selection().bounds(ctx.document());
+            Ok(Some(ctx.one_step(Edit::ReplaceText { range, text })))
+        });
+        p.shortcut("Mod-Alt-g", InsertGreeting { text: "Hello".to_owned() });
+    })
+}
+```
+
+Use `editor.run(command)` to execute a command. The config validates shortcut names such as `Enter`, `Shift-Tab`, and `Mod-Alt-g`.
+
+| Handler result | Effect |
+| --- | --- |
+| `Ok(Some(tx))` | The editor checks and applies the transaction. |
+| `Ok(None)` | The command is inapplicable. Keyboard dispatch can try the next matching binding. |
+| `Err(error)` | The editor discards the pending edit and reports the error. |
+
+## Input and transaction hooks
+
+| Method | Contract |
+| --- | --- |
+| `p.input_rule(handler)` | Inspect the document, selection, and inserted range after typing. Return `Ok(None)` to try the next rule. |
+| `p.mark_input_rule(mark, handler)` | Run an input rule and clear the given mark for subsequent typing when the rule matches. |
+| `p.on_break(node, handler)` | Handle a paragraph break for this node type. Shared ancestor containers run from nearest to outermost, followed by the text block. Return `Ok(None)` to fall through to the next handler or the default break. |
+| `p.handle_paste(handler)` | Inspect pasted text before insertion. The first handler that returns a transaction handles the paste. |
+| `p.paste_rule(handler)` | Return edits for the newly inserted paste range. |
+| `p.filter_transaction(check)` | Return `Ok(false)` to reject the proposed edit. |
+| `p.append_edits(plan)` | Return follow-up edits when opening a document or committing a draft. Later handlers see earlier edits. Return an empty vector when the rule is satisfied. |
+
+`DocumentChange` contains the proposed `document`, `schema`, `default_text_block`, previous document in `before`, and paste range in `pasted`. Opening a document sets `before` to `None`. Follow-up edits share the original undo entry and must converge within 32 passes.
+
+## Context, transactions, and state
+
+| Type | Operations |
+| --- | --- |
+| `CommandContext` | `document()`, `selection()`, `schema()`, and `config()` read the current draft. `cursor_marks()` resolves effective marks at a caret. `transaction()` starts an edit. `plan(command)` plans a command in the same context. |
+| `Transaction` | `push(edit)` applies an edit to the draft, such as `Edit::Split { at }` to split a text block. `document()` reads the result or the first edit error. `select(selection)` and `set_stored_marks(marks)` set the final selection and typing marks. |
+| `Editor` | `run(command)` executes a command, `can(command)` checks applicability, and `chain().command(...).run()` groups commands into one transaction. `undo()` and `redo()` operate on document history. |
+
+A transaction belongs to the editor and draft it came from. Applying one from another editor returns `Error::ForeignTransaction`. A revision or selection mismatch returns `Error::StaleRevision`. Document positions count UTF-16 code units in text and include node boundaries.
+
+`Transaction::update_plugin_state::<S>(update)` initializes a missing value with `S::default()` and passes a mutable copy to the update function. The type must implement `Default + Clone + Debug + PartialEq + Send + Sync + 'static`. The write commits with the transaction. A failed or declined command chain discards it.
+
+`CommandContext::plugin_state::<S>()` reads the current draft. `Editor::plugin_state::<S>()` reads committed state. Both return `Option<&S>`. Each editor has one slot per concrete Rust type. Separate plugin instances using the same type share the slot within that editor. A newly opened editor starts empty. A fork starts with the current snapshot and then edits independently. Document undo and redo preserve plugin state.
+
+## Editing helpers
+
+| Module | Operations |
+| --- | --- |
+| `gpdoc_plugin::marks` | `FormattingMark` defines a mark with set, unset, and toggle command values, an optional shortcut, and delimiter rules. Use `set_mark`, `unset_mark`, or `toggle_mark` for custom handlers. |
+| `gpdoc_plugin::textblock` | Set or toggle the text block type and declare a text block input rule. |
+| `gpdoc_plugin::atom` | Declare and insert leaf nodes and build input or paste rules for them. |
+| `gpdoc_plugin::selection` | Find selected blocks, a node path, or the document range of the selection. |
+| `gpdoc_plugin::paste` | Iterate over text blocks affected by a paste. |
+
+## GPUI view plugins
+
+Use `gpdoc::EditorConfig::builder().plugin(feature())` to register a feature with its default GPUI view. Enable the crate's `gpui` feature when it offers one. To replace the default, import `gpdoc::PluginViewExt` and pass a renderer to `.with_view(...)`. A factory can return a `ViewPlugin`, an array, or a vector when a feature has several parts. For example, a mention view can supply both a chip and a picker.
+
+Plugin authors can supply a default by importing `gpdoc::PluginViewExt` and calling `plugin.gpui_default_view(factory)` in the crate’s `gpui` feature. In a GPUI editor, nodes with no specialized view still display their text and children, and atoms use their semantic labels. A custom view replaces the plugin's entire default composition. Include each part you want to keep.
+
+A view can wrap an editable body, lay out its children, or draw a node as an object. Use `ViewPlugin::node_format` and `ViewPlugin::mark_format` for text formatting. The surrounding GPUI element sets the inherited document typography.
+
+Call `.build()?` to validate the schema and the view targets. Open an editor entity with `config.open(DocumentSource::Blocks(blocks), cx)?`. Each editor gets its own behavior instances. For a complete block renderer, see [Render a plugin in GPUI](/docs/plugins/custom/gpui/).

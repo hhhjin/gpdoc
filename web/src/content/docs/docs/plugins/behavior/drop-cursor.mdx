@@ -1,0 +1,38 @@
+---
+title: Drop cursor
+description: Draw an insertion indicator while dragging over the editor.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Drag a paragraph by its handle. Move it between the other paragraphs to see the blue insertion line before you release it.
+
+<ViewPluginExample plugin="drop-cursor" title="Drop cursor example" />
+
+## Register the plugin
+
+In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+
+```sh
+cargo add gpdoc-plugin-drop-cursor
+```
+
+```rust
+use gpdoc_plugin_drop_cursor::drop_cursor;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(drop_cursor())
+    .build()?;
+```
+
+The painter receives the measured insertion bounds, window, and app. For a custom color, pass `|bounds, window, _| window.paint_quad(gpui::fill(bounds, gpui::rgb(0x4263eb)))` to `.with_view(...)`.
+
+Drag a file over the editor to see the colored indicator follow a valid drop position. To import files at that position, register the [File handler](/docs/plugins/behavior/file-handler/) with your app's import callback.
+
+## Source code
+
+[drop-cursor/src/lib.rs](/source/plugins/drop-cursor/src/lib.rs.txt)

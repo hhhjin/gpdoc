@@ -1,0 +1,133 @@
+---
+title: Markdown
+description: Import CommonMark into a gpdoc editor and export it back to Markdown.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Markdown converts between source text and a document described by your installed plugins. The conversion APIs return warnings for content they cannot represent.
+
+## Try it
+
+<PluginExample plugin="markdown" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-markdown
+```
+
+## Round-trip two paragraphs
+
+A blank line separates two paragraphs in Markdown. Use the Quickstart paragraph plugin to import both paragraphs and export them again.
+
+```rust
+use gpdoc::EditorConfig;
+
+use gpdoc_plugin_markdown::{open, to_markdown};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .build()?;
+let source = "First paragraph.\n\nSecond paragraph.";
+let imported = open(&config, source)?;
+assert_eq!(imported.value.document().blocks().len(), 2);
+assert!(imported.warnings.is_empty());
+
+let exported = to_markdown(&imported.value)?;
+assert!(exported.warnings.is_empty());
+assert_eq!(exported.value.trim(), source);
+```
+
+## Convert Markdown
+
+### open
+
+Pass an editor config and a Markdown string to open a new editor. Read the editor from the returned conversion’s `value` field. Missing plugins can produce warnings about formatting the config cannot represent.
+
+```rust
+let imported = open(&config, "First paragraph.")?;
+let editor = imported.value;
+```
+
+### to_markdown
+
+Pass a borrowed editor to produce a `Conversion<String, DocPos>`. Export uses the Markdown rules in that editor’s config.
+
+```rust
+let exported = to_markdown(&editor)?;
+let source = exported.value;
+```
+
+### Conversion warnings
+
+A `Conversion<T, P>` carries `value: T` and `warnings: Vec<Warning<P>>`. Each warning supplies a message and a position. Import positions are UTF-8 byte ranges in the input. Export positions are document positions. For example, importing raw HTML preserves it as text and reports a warning.
+
+```rust
+for warning in imported.warnings {
+	eprintln!("bytes {:?}: {}", warning.position, warning.message);
+}
+```
+
+## Commands
+
+### setMarkdown
+
+Register `markdown()` to add the command to an existing editor. Pass the required `markdown: String` argument. One transaction replaces the document and places the caret at its first available text position.
+
+```rust
+use gpdoc::EditorConfig;
+use gpdoc_plugin_markdown::markdown;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(markdown())
+    .build()?;
+let mut editor = open(&config, "Draft")?.value;
+editor.run(gpdoc_plugin_markdown::Set { markdown: "Published".into() })?;
+```
+
+## Custom syntax
+
+### Mark delimiters
+
+Declare the mark name and delimiter with `MarkdownSyntax::mark` to support literal punctuation such as `==urgent==`. Choose punctuation CommonMark delivers as ordinary inline text. Unmatched delimiters stay literal. Export warns if the delimiter cannot preserve mark attributes.
+
+```rust
+use gpdoc_plugin::{core::MarkSpec, Plugin};
+use gpdoc_plugin_markdown::MarkdownSyntax;
+
+let important = Plugin::new("important", |p| {
+    p.mark(MarkSpec::new("important"));
+    p.metadata(MarkdownSyntax::default().mark("important", "=="));
+});
+```
+
+### Fenced blocks
+
+Register a fence with `MarkdownSyntax::fence(node, info, parse, render)`. The info string must be unique and contain only ASCII letters, digits, hyphens, or underscores. The parser receives the body without the final newline and returns a node of the registered kind. The renderer returns the body for export.
+
+```rust
+use gpdoc_plugin::{core::{Error, Node, NodeSpec}, Plugin};
+use gpdoc_plugin_markdown::MarkdownSyntax;
+
+fn notice(
+	parse: fn(&str) -> Result<Node, Error>,
+	render: fn(&Node) -> String,
+) -> Plugin {
+    Plugin::new("notice", |p| {
+        p.node(NodeSpec::block("notice").group("block").content("text*"));
+        p.metadata(MarkdownSyntax::default().fence("notice", "notice", parse, render));
+    })
+}
+```
+
+## Source code
+
+- [markdown/src/lib.rs](/source/plugins/markdown/src/lib.rs.txt)
+- [markdown/src/export.rs](/source/plugins/markdown/src/export.rs.txt)
+- [markdown/src/import.rs](/source/plugins/markdown/src/import.rs.txt)
+- [markdown/src/rules.rs](/source/plugins/markdown/src/rules.rs.txt)

@@ -1,0 +1,60 @@
+---
+import ExamplePanel from "./ExamplePanel.astro";
+
+const source = {
+  type: "doc",
+  content: [{
+    type: "paragraph",
+    content: [{ type: "text", text: "Hello", marks: [{ type: "bold" }] }],
+  }],
+};
+---
+
+<ExamplePanel
+  kind="json"
+  title="Round-trip a Tiptap document"
+  hint="Edit the text or marks in the JSON, then run the round-trip to check the schema."
+>
+  <div class="example-controls">
+    <button type="submit">Run round-trip</button>
+    <button type="button" data-copy disabled>Copy JSON</button>
+  </div>
+  <div class="json-panes">
+    <label class="example-label">
+      Input JSON
+      <textarea name="source" rows="11" spellcheck="false" autocomplete="off" required>{JSON.stringify(source, null, 2)}</textarea>
+    </label>
+    <label class="example-label">
+      Exported JSON
+      <textarea name="result" rows="11" readonly placeholder="The exported document appears here."></textarea>
+    </label>
+  </div>
+</ExamplePanel>
+
+<style>
+  .json-panes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .json-panes textarea {
+    width: 100%;
+    padding: 0.625rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    resize: vertical;
+    white-space: pre;
+  }
+
+  textarea[readonly] {
+    background: var(--sl-color-bg-sidebar);
+  }
+
+  @media (max-width: 42rem) {
+    .json-panes {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

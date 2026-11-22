@@ -1,0 +1,40 @@
+---
+title: Box selection
+description: Drag a rectangle from the margin outside a block to select whole blocks.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Press in the left margin beside “Draft the outline”. Hold the mouse button and drag diagonally across “Review the draft”. Both paragraphs highlight as the rectangle crosses them. Release to keep the blocks selected.
+
+<ViewPluginExample plugin="box-selection" title="Box selection example" />
+
+Start the drag outside all blocks. Inside a paragraph, even the blank space after the last character uses normal text selection. The box selects whole top-level blocks, including an entire list or table when it intersects one.
+
+## Register the plugin
+
+```sh
+cargo add gpdoc-plugin-box-selection
+```
+
+```rust
+use gpdoc_plugin_box_selection::box_selection;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(box_selection())
+    .build()?;
+```
+
+Use `EditorSurface::layout` to leave space between the editable document and the edge of the surface. A drag starting in this space can select blocks. The [page layout example](/docs/quickstart/#place-the-document-in-a-page) centers the document and leaves a gutter on both sides.
+
+Pass a renderer to `.with_view(...)` with the signature `fn(Bounds<Pixels>, &mut Window, &mut App) -> gpui::Div` to change the rectangle. The plugin positions and sizes the overlay and updates the block selection.
+
+For keyboard-based block selection, also register [Node range](/docs/plugins/behavior/node-range/).
+
+## Source code
+
+[box-selection/src/lib.rs](/source/plugins/box-selection/src/lib.rs.txt)

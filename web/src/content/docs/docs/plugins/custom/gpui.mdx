@@ -1,0 +1,85 @@
+---
+title: Render a plugin in GPUI
+description: Wrap a caption's editable text in a labeled GPUI element and open it in a desktop window.
+---
+
+Display a label above each [caption block](/docs/plugins/custom/first-plugin/). The document plugin defines the caption's content. A GPUI view plugin draws the label and places the editor's editable content underneath.
+
+## Add a desktop example
+
+In `gpdoc-writing`, add the dependencies for a Cargo example. The paragraph plugin is already a development dependency from the first guide. For system prerequisites, see the [quickstart](/docs/quickstart/).
+
+```sh
+cargo add --dev gpdoc --features gpui
+cargo add --dev gpui@=0.2.2
+cargo add --dev gpdoc-plugin-paragraph --features gpui
+```
+
+Create `examples/caption/view.rs` for the caption component.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpui::{div, prelude::*, px};
+
+pub fn caption_view() -> ViewPlugin {
+    ViewPlugin::named("captionView").for_plugin("caption").wrap_node("caption", |view, content, _, _| {
+        let label = view.node.attrs.get("label")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Figure");
+        div().flex().flex_col().p(px(12.))
+            .child(label.to_owned())
+            .child(content)
+    })
+}
+```
+
+In `examples/caption/main.rs`, register the function from the view module with the caption plugin.
+
+```rust
+mod view;
+
+use gpdoc::{DocumentSource, EditorConfig, PluginViewExt};
+use gpdoc_plugin::prelude::Node;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_writing::caption;
+use gpui::{Application, Focusable, WindowOptions};
+
+fn main() {
+    Application::new().run(|cx| {
+        let config = EditorConfig::builder()
+            .plugin(paragraph())
+            .plugin(caption().with_view(view::caption_view))
+            .build()
+            .expect("configure caption view");
+        let blocks = vec![Node::text("caption", "A view of the harbor")];
+        let window = cx.open_window(WindowOptions::default(), |_, cx| {
+            config.open(DocumentSource::Blocks(blocks), cx).expect("open caption")
+        }).expect("open window");
+
+        window.update(cx, |editor, window, cx| {
+            window.focus(&editor.focus_handle(cx));
+            cx.activate(true);
+        }).expect("focus editor");
+    });
+}
+```
+
+The view declares `caption` as its owner with `for_plugin("caption")`. The configuration checks both the owner and the target node when you call `build()`. The callback receives the node and the editable element. Place `content` once so the caption keeps its caret, selection, and keyboard input. The label comes from the node's `label` attribute when present.
+
+## Edit the caption
+
+Run `cargo run --example caption`. The window opens with **Figure** above **A view of the harbor**. Click after “harbor,” type a word, and undo it. Only the caption text participates in that edit. The label belongs to the GPUI wrapper.
+
+For an inline object or a block leaf, use `node_view` to draw the object itself. For a container that arranges editable children, use `child_layout` and render each supplied child once. The [table plugin](/docs/plugins/structure/table/) uses a child layout for its cells.
+
+## Anchor a popup
+
+Implement `ViewBehavior::render` to place an element relative to the editor's visible text. Call `frame.caret_bounds()` for a completion list or `frame.selection_bounds()` for a selection menu. Both return `Option<Bounds<Pixels>>`. Use `?` to skip rendering when the anchor is outside the view.
+
+Return `Some(AnchoredElement::above(bounds, element))` for a menu above a selection, or `Some(AnchoredElement::below(bounds, element))` for choices below the caret. Return `None` when the popup is closed. The [suggestion picker](/docs/plugins/behavior/suggestion/#show-a-picker-in-gpui) also calls `.exclusive()` while it has choices.
+
+## Handle a block drop
+
+Use `ViewPlugin::named(name).wrap_blocks(...)` to place a control beside each top-level block. Put the supplied editable body in the wrapper once. A drag handle can use the block's `before` position to identify the block when a drag starts.
+
+Register `.on_block_drop(...)` on that plugin to receive the typed drag payload and the destination document position. Apply the move as an editor transaction and return whether the drop succeeded. The [drag handle implementation](/source/plugins/drag-handle/src/lib.rs.txt) checks that the drag belongs to the same editor and document revision before moving blocks.

@@ -1,0 +1,119 @@
+---
+title: Quickstart
+description: Open a rich-text editor in a GPUI window and add plugins to it.
+---
+
+import GpuiEditorExample from "../../../components/GpuiEditorExample.astro";
+
+Open a desktop editor with a blank paragraph, native text input, and undo.
+
+## Create a Rust project
+
+On macOS, install Rust and Xcode's Metal toolchain. Create a new app and add the editor crate.
+
+```sh
+cargo new gpdoc-quickstart
+cd gpdoc-quickstart
+cargo add gpdoc --features gpui
+cargo add gpui@=0.2.2
+cargo add gpdoc-plugin-paragraph --features gpui
+```
+
+## Open an editor window
+
+Put this in `src/main.rs`.
+
+```rust
+use gpdoc::{DocumentSource, EditorConfig};
+use gpdoc_plugin_paragraph::paragraph;
+use gpui::{Application, Focusable, WindowOptions};
+
+fn main() {
+    Application::new().run(|cx| {
+        let config = EditorConfig::builder()
+            .plugin(paragraph())
+            .build().expect("configure editor");
+        let window = cx
+            .open_window(WindowOptions::default(), |_, cx| {
+                config.open(DocumentSource::Empty, cx).expect("open editor")
+            })
+            .expect("open editor window");
+
+        window.update(cx, |editor, window, cx| {
+            window.focus(&editor.focus_handle(cx));
+            cx.activate(true);
+        }).expect("focus editor");
+    });
+}
+```
+
+Run `cargo run`, type in the empty paragraph, and undo the edit with **Command + Z** on macOS or **Ctrl + Z** on Linux. The paragraph plugin supplies an editable text block. Its default GPUI view inherits the font, text color, and line height from the surrounding application.
+
+## Configure the editor
+
+Add Bold with its default GPUI formatter. The plugin toolkit is also used in the headless examples.
+
+```sh
+cargo add gpdoc-plugin
+cargo add gpdoc-plugin-bold --features gpui
+```
+
+Import `gpdoc_plugin_bold::bold` in `main.rs` and replace the configuration in the application callback.
+
+```rust
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(bold())
+    .build()
+    .expect("configure editor");
+```
+
+Select a word and press **Command + B** on macOS or **Ctrl + B** on Linux to make it bold. To add a table or a clickable task checkbox, enable the feature crate’s `gpui` option. Its guide shows how to customize the default controls. See [Table](/docs/plugins/structure/table/) and [Task list](/docs/plugins/structure/task-list/).
+
+To open saved content with the same plugins, call `config.open(DocumentSource::Json(source), cx)?`. To save edits, call `view.editor().document().to_json()`. See [Tiptap compatibility](/docs/tiptap/#open-and-save-a-document-in-gpui) for the import and export code.
+
+## Place the document in a page
+
+Store the entity returned by `config.open(...)` in your page. In the page’s `render` method, use `EditorSurface` to set the scrollable input area. Its layout closure receives the editable document, which you can size and place with GPUI elements.
+
+```rust
+use gpdoc::{EditorSurface, EditorView};
+use gpui::{Entity, IntoElement, div, prelude::*, px};
+
+fn document_page(editor: &Entity<EditorView>) -> impl IntoElement {
+    EditorSurface::new(editor).layout(|document| {
+        div().w_full().flex().justify_center().px(px(24.)).py(px(48.))
+            .child(document.max_w(px(704.)))
+    })
+}
+```
+
+The surface fills its parent. The document is centered and shrinks to fit narrow windows. With the box selection plugin installed, dragging from the side margin into the document selects blocks. Dragging inside a paragraph selects text. Place a sidebar alongside the surface to give it its own input area.
+
+## Style a paragraph
+
+Put the component in `src/views.rs`. The supplied `content` keeps the caret, selection, and text input inside the styled paragraph.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_paragraph::paragraph_block;
+use gpui::{div, prelude::*, px};
+
+pub fn paragraph_view() -> ViewPlugin {
+    paragraph_block(|paragraph, _, _| {
+        div().font_family("Georgia").text_size(px(18.)).child(paragraph.content)
+    })
+}
+```
+
+Declare `mod views;` and import `gpdoc::PluginViewExt` in `main.rs`. Replace the paragraph registration with `.plugin(paragraph().with_view(views::paragraph_view))`. The editor uses this view for every paragraph. For typography shared by all blocks, set the font on the GPUI element that contains the editor.
+
+## Try the editor
+
+Start the browser editor and click a task checkbox. Undo the change with **Command + Z** on macOS or **Ctrl + Z** on Linux and Windows.
+
+<GpuiEditorExample />
+
+To run the same example in a desktop window from the gpdoc checkout, use `cargo run --locked -p gpdoc-editor-demo`.
+
+To add placeholders and cursors to the same editor, see [Register GPUI views](/docs/plugins/#register-gpui-views). To draw a custom node, see [Render a plugin in GPUI](/docs/plugins/custom/gpui/).

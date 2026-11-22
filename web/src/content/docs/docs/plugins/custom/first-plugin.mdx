@@ -1,0 +1,56 @@
+---
+title: Create your first plugin
+description: Create a Rust plugin that adds an editable caption block and test it without opening a window.
+---
+
+Define a caption block and open it in a headless editor. The examples use `gpdoc-writing` as the plugin crate name.
+
+## Add the dependencies
+
+Add the plugin toolkit to your crate. The caption test uses the paragraph plugin as a development dependency.
+
+```sh
+cargo add gpdoc_plugin
+cargo add --dev gpdoc gpdoc-plugin-paragraph
+```
+
+## Define a caption node
+
+Add the `caption` function to `src/lib.rs`.
+
+```rust
+use gpdoc_plugin::prelude::{NodeSpec, Plugin};
+
+pub fn caption() -> Plugin {
+    Plugin::new("caption", |p| {
+        p.node(NodeSpec::block("caption").group("block").content("inline*"));
+    })
+}
+```
+
+The `block` group lets a caption appear wherever the document accepts a block. The `inline*` content expression lets the caption contain text and other inline nodes, or be empty.
+
+Create `tests/caption.rs` and run `cargo test`. The paragraph plugin supplies the config's default text block.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Error, Node};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_writing::caption;
+
+#[test]
+fn open_a_caption() -> Result<(), Error> {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(caption())
+        .build()?;
+    let editor = Editor::from_document(&config, vec![Node::text("caption", "Figure 1")])?;
+    let block = &editor.document().blocks()[0];
+    assert_eq!(block.kind, "caption");
+    assert_eq!(block.child(0).projected_text(), "Figure 1");
+    Ok(())
+}
+```
+
+The passing test confirms that the config accepts a caption at the document root and retains its text. The plugin can define its node without opening a window or depending on GPUI.
+
+To add formatting and caption attributes, continue with [Nodes, marks, and attributes](/docs/plugins/custom/schema/). To implement an editing action, start with [Commands and shortcuts](/docs/plugins/custom/commands/).

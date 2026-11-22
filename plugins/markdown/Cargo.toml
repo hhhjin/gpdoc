@@ -1,0 +1,31 @@
+[package]
+name = "gpdoc-plugin-markdown"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "CommonMark import and export for gpdoc editors"
+
+[dependencies]
+gpdoc-plugin.workspace = true
+pulldown-cmark = { version = "0.13.6", default-features = false }
+pulldown-cmark-to-cmark = "22"
+
+[dev-dependencies]
+gpdoc-plugin-heading.workspace = true
+gpdoc-plugin-blockquote.workspace = true
+gpdoc-plugin-ordered-list.workspace = true
+gpdoc-plugin-list-item.workspace = true
+gpdoc-plugin-bold.workspace = true
+gpdoc-plugin-italic.workspace = true
+gpdoc-plugin-link.workspace = true
+gpdoc-plugin-inline-code.workspace = true
+gpdoc-plugin-code-block.workspace = true
+gpdoc-plugin-strike.workspace = true
+gpdoc-plugin-horizontal-rule.workspace = true
+gpdoc-plugin-paragraph.workspace = true
+serde_json = "1"
+gpdoc-plugin-task-list.workspace = true
+gpdoc-plugin-table.workspace = true
+gpdoc-plugin-image.workspace = true
+gpdoc-plugin-mathematics.workspace = true

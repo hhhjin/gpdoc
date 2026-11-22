@@ -1,0 +1,15 @@
+[package]
+name = "gpdoc-plugin-list-kit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "gpdoc support for the list plugin bundle"
+
+[dependencies]
+gpdoc-plugin.workspace = true
+gpdoc-plugin-bullet-list.workspace = true
+gpdoc-plugin-ordered-list.workspace = true
+gpdoc-plugin-list-item.workspace = true
+gpdoc-plugin-task-list.workspace = true
+gpdoc-plugin-list-keymap.workspace = true

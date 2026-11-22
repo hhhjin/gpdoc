@@ -1,0 +1,111 @@
+---
+title: Character count
+description: Count characters and words or enforce a character limit.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Use Character count for a word count in the editor footer or a length limit on an input. The default text count uses UTF-16 code units, so an emoji like 😀 counts as two.
+
+## Try it
+
+<PluginExample plugin="character-count" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-character-count
+```
+
+## Count a status update
+
+For a footer, read both counts from the current document after each edit. To enforce the same limit in the editor, register the configured plugin before you open the document.
+
+With the paragraph plugin installed, this document has six UTF-16 code units and two words. The config prevents edits that would take the count above 140.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_character_count::{
+	character_count, characters, words, CountMode, CountOptions,
+};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(character_count(CountOptions { limit: Some(140), ..Default::default() }))
+    .build()?;
+let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi! 😀")])?;
+assert_eq!(characters(editor.document(), CountMode::TextSize), 6);
+assert_eq!(words(editor.document()), 2);
+```
+
+## Settings
+
+### Limit
+
+Set `CountOptions::limit` to `Some(n)` to cap the document at a positive character count. The default, `None`, and `Some(0)` allow any length. When a paste exceeds the limit, the editor can shorten the inserted text at a whole-character boundary.
+
+```rust
+let counter = character_count(CountOptions { limit: Some(140), ..Default::default() });
+```
+
+### Trim on open
+
+With `auto_trim` enabled (the default), opening an oversized document removes excess content from the beginning. Disable it to preserve the initial text while still preventing further growth.
+
+```rust
+let counter = character_count(CountOptions {
+	limit: Some(140),
+	auto_trim: false,
+	..Default::default()
+});
+```
+
+### Counting mode
+
+The default `CountMode::TextSize` counts text in UTF-16 code units. Choose `NodeSize` to include the space occupied by the document structure.
+
+```rust
+let counter = character_count(CountOptions { mode: CountMode::NodeSize, ..Default::default() });
+```
+
+### Custom counters
+
+Both `text_counter` and `word_counter` accept a `fn(&str) -> usize`. By default, the word counter splits on literal spaces and counts nonempty parts. This version counts Unicode scalar values and splits words on whitespace.
+
+```rust
+let counter = character_count(CountOptions {
+	text_counter: |s| s.chars().count(),
+	word_counter: |s| s.split_whitespace().count(),
+	..Default::default()
+});
+```
+
+## Read counts
+
+### Characters and words
+
+Call the free functions on a document to obtain the default counts as `usize`. These functions also work in a config that has no counter installed.
+
+```rust
+let units = characters(editor.document(), CountMode::TextSize);
+let word_count = words(editor.document());
+```
+
+### Count a single node
+
+Call `CountOptions::characters` or `CountOptions::words` with a node to apply your chosen counting rules. Pass the document root to count everything.
+
+```rust
+use gpdoc_plugin_character_count::CountOptions;
+
+let options = CountOptions::default();
+let first_block = &editor.document().blocks()[0];
+let count = options.words(first_block);
+```
+
+## Source code
+
+[character-count/src/lib.rs](/source/plugins/character-count/src/lib.rs.txt)

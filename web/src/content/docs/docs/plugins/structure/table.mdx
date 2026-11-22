@@ -1,0 +1,189 @@
+---
+title: Table
+description: Insert tables and edit their rows, columns, headers, and cells.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`table()` registers the table, row, cell, and header cell nodes together. You can select a rectangle of cells to merge or edit them as a group.
+
+## Try it
+
+<PluginExample plugin="table" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-table --features gpui
+```
+
+Register `table()` to get an editable grid with cell selection and column resizing. To supply cell borders, custom headers or a resize guide, attach your own composition.
+
+```rust
+use gpdoc::{EditorConfig, PluginViewExt};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_table::table;
+
+mod views;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(table().with_view(views::table_grid_view))
+    .build()?;
+```
+
+In `views.rs`, compose decorations and editable content for each cell. The cell includes its document node, position, row and column ranges, and selection state. Add background layers in paint order. The grid inserts the editable subtree into the container passed to `content` and retains the full cell bounds for hit testing.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_table::{TableCell, default_resize_guide, table_grid};
+use gpui::{App, Window, div, prelude::*, px, rgb, rgba};
+
+pub fn table_grid_view() -> ViewPlugin {
+    table_grid(cell, default_resize_guide)
+}
+
+fn cell(mut cell: TableCell, _: &mut Window, _: &mut App) -> TableCell {
+    let background = div()
+        .border_1()
+        .border_color(rgb(0xc8cbd0))
+        .when(cell.is_header(), |el| el.bg(rgb(0xf0f2f5)));
+    cell = cell.layer(background);
+    if cell.selected {
+        cell = cell.layer(div().bg(rgba(0x548de83d)));
+    }
+    cell.content(div().p(px(4.)))
+}
+```
+
+Use `table_grid(default_cell, default_resize_guide)` for the built-in appearance. To draw a custom resize guide, pass a painter taking the guide bounds, window and app. Use `.plugin(table())` for table commands alone.
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), insert a 3-row, 2-column table with a header row.
+
+```rust
+use std::num::NonZeroUsize;
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_table::table;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(table())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
+editor.run(gpdoc_plugin_table::Insert {
+    rows: NonZeroUsize::new(3).unwrap(),
+    columns: NonZeroUsize::new(2).unwrap(),
+    with_header_row: true,
+})?;
+
+let nodes = editor.document().iter_nodes();
+assert_eq!(nodes.filter(|(_, node)| node.kind == "tableHeader").count(), 2);
+```
+
+## Settings
+
+Register `gpdoc_plugin_table::table()` with `paragraph()` to install all four table node types. The same registration supplies the table commands and cell selection behavior.
+
+### Table dimensions
+
+Set the dimensions and header option on `gpdoc_plugin_table::Insert`. Each new cell starts with an empty paragraph.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `rows` | `NonZeroUsize` | `3` |
+| `columns` | `NonZeroUsize` | `3` |
+| `with_header_row` | `bool` | `true` |
+
+### Cell attributes
+
+Regular cells and header cells both have integer `colspan` and `rowspan` attributes (default `1`), nullable string `align` (default `null`), and JSON `colwidth` (default `null`). Resizing a column supplies one width entry per column the cell spans.
+
+## Commands
+
+### Insert or remove a table
+
+`Insert` creates a table with up to 100,000 cells at a selection that allows a table. In an empty paragraph or a fully selected text block, it replaces that block. To create a default table, run `Insert::default()`.
+
+```rust
+editor.run(gpdoc_plugin_table::Insert::default())?;
+```
+
+To remove the table containing the start of the selection, run `Delete`. Use `DeleteSelected` to remove a table only when a cell selection covers every cell.
+
+### Select cells
+
+`SetSelection` selects a rectangle between two cells in the same table. Pass the document position immediately before the first cell as `anchor_cell`. The optional `head_cell` defaults to the anchor. Both are nonnegative integers. In the empty 3-by-2 table from the example above, the first two header cells start at positions 2 and 6.
+
+```rust
+editor.run(gpdoc_plugin_table::SetSelection { anchor_cell: 2, head_cell: Some(6) })?;
+```
+
+### Add or delete rows and columns
+
+Place the caret in a cell or select a rectangle. These commands take no arguments.
+
+| Command | Result |
+| --- | --- |
+| `AddRowBefore`, `AddRowAfter` | Insert a row above or below the selection. |
+| `AddColumnBefore`, `AddColumnAfter` | Insert a column to the left or right of the selection. |
+| `DeleteRow`, `DeleteColumn` | Remove the selected rows or columns. At least one row and one column must remain. |
+
+```rust
+editor.run(gpdoc_plugin_table::AddRowAfter)?;
+```
+
+### Merge or split cells
+
+Run `MergeCells` on a rectangular selection of multiple cells. Every selected cell must fit entirely inside the rectangle. Run `SplitCell` inside a single spanning cell to divide it. Its content stays in the upper-left cell. Use `MergeOrSplit` to choose between these actions based on the selection.
+
+```rust
+editor.run(gpdoc_plugin_table::MergeCells)?;
+```
+
+### Change headers and alignment
+
+Inside the table, run `ToggleHeaderRow` or `ToggleHeaderColumn` to toggle the first row or first column. Use `ToggleHeaderCell` to turn selected cells into headers. If any selected cell is already a header, the selection becomes regular cells.
+
+`SetCellAttribute` applies an attribute to the current cell or all selected cells. Pass the attribute's string `name` and a `value` of the matching type.
+
+```rust
+editor.run(gpdoc_plugin_table::SetCellAttribute { name: "align".into(), value: "center".into() })?;
+```
+
+### Resize a column
+
+`ResizeColumn` updates every cell covering the specified column. Pass a document position identifying the table in `cell`, a zero-based integer `column`, and a positive integer `width`. The position in this example identifies the first cell of the example table.
+
+```rust
+editor.run(gpdoc_plugin_table::ResizeColumn { cell: 2, column: 0, width: 180 })?;
+```
+
+### Repair a table grid
+
+`Fix` scans the document for malformed table grids and repairs them. You can run it with the selection outside a table.
+
+```rust
+editor.run(gpdoc_plugin_table::Fix)?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Command | Result |
+| --- | --- | --- |
+| **Tab** | `Tab` | Select the next cell’s text. At the last cell, append a row and advance into it. |
+| **Shift + Tab** | `PreviousCell` | Select the previous cell’s text, if there is a previous cell. |
+| **Backspace**, **Delete**, or either key with **Mod** | `DeleteSelected` | Remove the table when every cell is selected. |
+
+To move forward only when the next cell exists, use `GoToNextCell`.
+
+```rust
+editor.run(gpdoc_plugin_table::GoToNextCell)?;
+```
+
+## Source code
+
+- [table/src/lib.rs](/source/plugins/table/src/lib.rs.txt)
+- [table/src/grid.rs](/source/plugins/table/src/grid.rs.txt)

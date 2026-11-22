@@ -1,0 +1,14 @@
+[package]
+name = "gpdoc-plugin-unique-id"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Unique Id plugin for the gpdoc editor"
+
+[dependencies]
+gpdoc-plugin.workspace = true
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+gpdoc-plugin-paragraph.workspace = true

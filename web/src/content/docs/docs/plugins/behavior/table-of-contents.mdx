@@ -1,0 +1,107 @@
+---
+title: Table of contents
+description: Assign heading anchors and read an outline for document navigation.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Table of contents assigns stable IDs to nonempty headings. Use the outline's positions to build a sidebar that jumps to sections.
+
+## Try it
+
+<PluginExample plugin="table-of-contents" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-table-of-contents
+```
+
+## Read the outline for a document
+
+This example indexes the default `heading` type. Add `gpdoc-plugin-heading` to the Quickstart project to run it. The first outline entry contains the heading text and its generated anchor.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_heading::heading;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_table_of_contents::{headings, table_of_contents};
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(heading())
+    .plugin(table_of_contents())
+    .build()?;
+let editor = Editor::from_document(&config, vec![Node::text("heading", "Release notes")])?;
+
+let entries = headings(editor.document());
+assert_eq!(entries[0].text, "Release notes");
+assert!(!entries[0].id.is_empty());
+```
+
+## Settings
+
+### Heading types and anchor IDs
+
+The default plugin indexes nonempty `heading` nodes and generates UUID v4 strings. To use other block types or a different ID generator, pass their names and a callback from `&str` to `String` to `table_of_contents_with`. Generated anchors populate both `id` and `data-toc-id`. A generator must handle repeated heading text.
+
+```rust
+use gpdoc_plugin_table_of_contents::table_of_contents_with;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+let next = AtomicUsize::new(1);
+let toc = table_of_contents_with(["heading"], move |_| {
+	format!("section-{}", next.fetch_add(1, Ordering::Relaxed))
+});
+```
+
+## Read headings
+
+### headings
+
+Read `Vec<Heading>` from the current document after an edit. Each entry’s `id` and `text` are strings. The stable ID identifies the heading across edits. Its `pos: DocPos` tracks the current block position.
+
+```rust
+let entries = headings(editor.document());
+let first = &entries[0];
+assert_eq!(first.text, "Release notes");
+```
+
+### outline
+
+Pass the node names you configured to list their entries in document order. Each entry exposes the stored `original_level: i64`, the computed outline depth `level: usize`, and its one-based `item_index: usize`. The default numbering increments across the entire outline.
+
+```rust
+use gpdoc_plugin_table_of_contents::outline;
+
+let entries = outline(editor.document(), &["heading".into()]);
+```
+
+### outline_at
+
+Supply the first visible document position to mark the active heading. `is_scrolled_over` is true for each heading at or before that position. `is_active` identifies the last such heading. Passing `None` leaves both flags false. Use `Indexing::Hierarchical` to restart numbering within each section or `Indexing::Linear` for continuous numbering.
+
+```rust
+use gpdoc_plugin::core::DocPos;
+use gpdoc_plugin_table_of_contents::{outline_at, Indexing};
+
+let entries = outline_at(editor.document(), &["heading".into()], Some(DocPos(1)), Indexing::Hierarchical);
+let active = entries.iter().find(|entry| entry.is_active);
+```
+
+## Commands
+
+### updateTableOfContents
+
+This command takes no arguments and produces an empty transaction. Heading readers already derive entries from the current document. Use them directly to display the outline after a change.
+
+```rust
+let mut editor = editor;
+editor.run(gpdoc_plugin_table_of_contents::Update)?;
+```
+
+## Source code
+
+[table-of-contents/src/lib.rs](/source/plugins/table-of-contents/src/lib.rs.txt)

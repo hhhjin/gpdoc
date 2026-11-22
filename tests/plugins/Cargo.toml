@@ -1,0 +1,48 @@
+[package]
+name = "gpdoc-integration-tests"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dev-dependencies]
+gpdoc-plugin.workspace = true
+gpdoc-plugin-audio.workspace = true
+gpdoc-plugin-blockquote.workspace = true
+gpdoc-plugin-bold.workspace = true
+gpdoc-plugin-bullet-list.workspace = true
+gpdoc-plugin-character-count.workspace = true
+gpdoc-plugin-code-block-lowlight.workspace = true
+gpdoc-plugin-code-block.workspace = true
+gpdoc-plugin-details.workspace = true
+gpdoc-plugin-find-and-replace.workspace = true
+gpdoc-plugin-hard-break.workspace = true
+gpdoc-plugin-heading.workspace = true
+gpdoc-plugin-highlight.workspace = true
+gpdoc-plugin-horizontal-rule.workspace = true
+gpdoc-plugin-image.workspace = true
+gpdoc-plugin-inline-code.workspace = true
+gpdoc-plugin-italic.workspace = true
+gpdoc-plugin-link.workspace = true
+gpdoc-plugin-list-item.workspace = true
+gpdoc-plugin-list-keymap.workspace = true
+gpdoc-plugin-list-kit.workspace = true
+gpdoc-plugin-markdown = { path = "../../plugins/markdown" }
+gpdoc-plugin-mathematics.workspace = true
+gpdoc-plugin-mention.workspace = true
+gpdoc-plugin-ordered-list.workspace = true
+gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-ruby-text.workspace = true
+gpdoc-plugin-strike.workspace = true
+gpdoc-plugin-subscript.workspace = true
+gpdoc-plugin-superscript.workspace = true
+gpdoc-plugin-table-of-contents.workspace = true
+gpdoc-plugin-table.workspace = true
+gpdoc-plugin-task-list.workspace = true
+gpdoc-plugin-text-align.workspace = true
+gpdoc-plugin-text-style.workspace = true
+gpdoc-plugin-trailing-node.workspace = true
+gpdoc-plugin-typography.workspace = true
+gpdoc-plugin-underline.workspace = true
+gpdoc-plugin-unique-id.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

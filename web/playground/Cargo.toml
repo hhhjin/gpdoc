@@ -1,0 +1,78 @@
+[package]
+name = "gpdoc-playground"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpdoc-demo-fonts.workspace = true
+guic-gpui-assets = "0.6.2"
+gpui-icons.workspace = true
+gpdoc = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-slash-command = { workspace = true, features = ["gpui"] }
+gpui = { package = "gpui-unofficial", version = "=1.29.1", default-features = false }
+
+gpdoc-plugin-audio = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-blockquote = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bold = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bullet-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-code-block = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-bubble-menu.workspace = true
+gpdoc-plugin-drag-handle.workspace = true
+gpdoc-plugin-file-handler.workspace = true
+gpdoc-plugin-floating-menu.workspace = true
+gpdoc-plugin-focus.workspace = true
+gpdoc-plugin-invisible-characters = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-details = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-drop-cursor.workspace = true
+gpdoc-plugin-gap-cursor.workspace = true
+gpdoc-plugin-box-selection.workspace = true
+gpdoc-plugin-node-range.workspace = true
+gpdoc-plugin-hard-break.workspace = true
+gpdoc-plugin-heading = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-highlight = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-horizontal-rule = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-image = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-inline-code = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-italic = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-link = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-list-item = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-list-keymap.workspace = true
+gpdoc-plugin-mathematics = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-mention = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-ordered-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-paragraph = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-placeholder.workspace = true
+gpdoc-plugin-strike = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-subscript = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-superscript = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-underline = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-table = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-task-list = { workspace = true, features = ["gpui"] }
+gpdoc-plugin-character-count.workspace = true
+gpdoc-plugin-code-block-lowlight.workspace = true
+gpdoc-plugin-collaboration = { path = "../../plugins/collaboration" }
+gpdoc-plugin-collaboration-caret = { path = "../../plugins/collaboration-caret" }
+gpdoc-plugin-find-and-replace.workspace = true
+gpdoc-plugin-list-kit.workspace = true
+gpdoc-plugin-markdown = { path = "../../plugins/markdown" }
+gpdoc-plugin-ruby-text.workspace = true
+gpdoc-plugin-suggestion.workspace = true
+gpdoc-plugin-table-of-contents.workspace = true
+gpdoc-plugin-text-align.workspace = true
+gpdoc-plugin-text-style.workspace = true
+gpdoc-plugin-trailing-node.workspace = true
+gpdoc-plugin-typography.workspace = true
+gpdoc-plugin-unique-id.workspace = true
+gpui_web = { package = "gpui-web-gpui-unofficial", version = "=1.29.1", default-features = false }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element"] }
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

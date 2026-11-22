@@ -1,0 +1,39 @@
+---
+title: Invisible characters
+description: Display markers for spaces, line breaks, and paragraph ends.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Click after “Two words” and press **Space** to add a space marker. Press **Enter** to see a new paragraph end.
+
+<ViewPluginExample plugin="invisible-characters" title="Invisible characters example" />
+
+## Register the plugin
+
+Enable the GPUI view and register the plugin in the [Quickstart app](/docs/quickstart/#configure-the-editor).
+
+```sh
+cargo add gpdoc-plugin-invisible-characters --features gpui
+```
+
+```rust
+use gpdoc::EditorConfig;
+use gpdoc_plugin_invisible_characters::invisible_characters;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(invisible_characters(true))
+    .build()?;
+```
+
+The document plugin stores visibility for each editor. Pass `true` to show markers when the editor opens, or `false` to start with them hidden. The view paints the markers over the document. To draw your own glyphs, use `invisible_characters(true).with_view(|| character_markers(your_painter))`. Each `CharacterMarker` supplies its `MarkerKind`, UTF-16 document position and measured bounds. Use `frame.paint_text` to match the editor font.
+
+Run `toggleInvisibleCharacters` to switch visibility. Use `showInvisibleCharacters` or `hideInvisibleCharacters` to set it explicitly. These commands preserve the document's text.
+
+## Source code
+
+[invisible-characters/src/lib.rs](/source/plugins/invisible-characters/src/lib.rs.txt)

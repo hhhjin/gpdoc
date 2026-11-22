@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  publish:
+    if: vars.RELEASE_PLZ_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      id-token: write
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+    steps:
+      - &checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - &rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+        with:
+          toolchain: stable
+      - name: Check package licenses
+        run: |
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+          jq -r '.packages[] | select(.publish != []) | [.name, .license] | @tsv' \
+            "$RUNNER_TEMP/metadata.json" > "$RUNNER_TEMP/licenses.tsv"
+          while IFS=$'\t' read -r package license; do
+            if [[ "$license" != MIT ]]; then
+              echo "$package must declare the MIT license" >&2
+              exit 1
+            fi
+            if ! cargo package --list -p "$package" | grep -Fx LICENSE > /dev/null; then
+              echo "$package must include LICENSE" >&2
+              exit 1
+            fi
+          done < "$RUNNER_TEMP/licenses.tsv"
+      - id: release
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5
+        with:
+          command: release
+          config: .github/release-publish.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-pr:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-pr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - *checkout
+      - *rust
+      - uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  web-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - *checkout
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "$BEFORE" =~ ^0+$ ]]; then
+            BEFORE=$(git hash-object -w -t tree /dev/null)
+          fi
+          files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- web/)
+          if [[ -n "$files" ]]; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-web:
+    needs: [web-changes, publish]
+    if: >-
+      !cancelled() &&
+      (needs.web-changes.outputs.changed == 'true' || needs.publish.outputs.releases_created == 'true')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy-web.yml
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

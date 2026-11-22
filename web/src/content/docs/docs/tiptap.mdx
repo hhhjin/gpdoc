@@ -1,0 +1,54 @@
+---
+title: Tiptap compatibility
+description: Open a Tiptap document in a GPUI editor and save it as ProseMirror JSON.
+---
+
+import JsonExample from "../../../components/JsonExample.astro";
+
+A GPUI app can open the same ProseMirror JSON that your Tiptap editor saves. Configure the GPUI editor with plugins for the content you use. For example, if your Tiptap document contains a table, include the table plugin when you build the view.
+
+## Try a JSON round-trip
+
+<JsonExample />
+
+This example supports paragraphs, text, and the `bold` and `italic` marks. Change the mark to `italic` and run the round-trip again. Try a mark like `underline` to see how the codec reports a plugin that the schema does not include.
+
+## Open and save a document in GPUI
+
+In your Tiptap app, call `JSON.stringify(editor.getJSON())` to get the document string. Pass that string as `source` when creating the GPUI editor view. For the document above, register Paragraph, Bold, and Italic. After completing [Configure the editor](/docs/quickstart/#configure-the-editor), run `cargo add gpdoc-plugin-italic --features gpui`.
+
+```rust
+use gpdoc::{DocumentSource, EditorConfig, EditorView};
+use gpdoc_plugin_bold::bold;
+use gpdoc_plugin_italic::italic;
+use gpdoc_plugin_paragraph::paragraph;
+use gpui::{App, Entity};
+use std::error::Error;
+
+fn open_document(source: &str, cx: &mut App) -> Result<Entity<EditorView>, Box<dyn Error>> {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(italic())
+        .build()?;
+    Ok(config.open(DocumentSource::Json(source), cx)?)
+}
+```
+
+When the user saves, read the current document from the view. Your app can store this JSON and pass `JSON.parse(saved)` as the `content` option the next time it opens a Tiptap editor.
+
+```rust
+fn document_json(view: &gpdoc::EditorView) -> Result<String, Box<dyn Error>> {
+    Ok(view.editor().document().to_json()?)
+}
+```
+
+For window setup and keyboard focus, see [Open an editor window](/docs/quickstart/#open-an-editor-window).
+
+When porting a Tiptap extension, keep its node and mark names, attribute keys, and schema rules consistent across both editors. Write command handlers in Rust and use GPUI node views for native rendering. See the [plugin reference](/docs/plugins/) for built-in equivalents.
+
+## Compatibility coverage
+
+gpdoc's compatibility tests compare it with Tiptap 3.34.0. Each case opens the same document in both editors and compares JSON, selection, and command results after each edit. The runner also opens the exports in Tiptap with strict content validation.
+
+To check a schema your app uses, round-trip a representative document through both editors with the same nodes, marks, and attributes enabled.

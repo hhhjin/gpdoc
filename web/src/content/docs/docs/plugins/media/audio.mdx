@@ -1,0 +1,157 @@
+---
+title: Audio
+description: Store an audio source and playback attributes in the document.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`audio(Default::default())` adds a block audio node. It stores the source and playback attributes, including whether to show controls, mute playback, or loop.
+
+## Try it
+
+<PluginExample plugin="audio" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-audio
+```
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), insert an audio node that references a relative path.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_audio::audio;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(audio(Default::default()))
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
+editor.run(gpdoc_plugin_audio::Set {
+    src: "./media/interview.ogg".into(),
+    muted: Some(true),
+    ..Default::default()
+})?;
+
+let block = &editor.document().blocks()[0];
+assert_eq!(block.kind, "audio");
+assert_eq!(block.attrs["muted"], true);
+```
+
+The empty paragraph becomes an audio block. The document keeps the path exactly as supplied. Give the host access to the file at that path when you want to play it.
+
+## Native view
+
+Enable the `gpui` feature. Registering `audio(Default::default())` displays the source label and enables native media activation. To supply playback controls, pass your view function to `with_view`.
+
+```rust
+use gpdoc::{PluginViewExt, ViewPlugin};
+use gpdoc_plugin_audio::{AudioNode, audio, audio_controls};
+use gpui::prelude::*;
+
+fn player() -> ViewPlugin {
+    audio_controls(|clip: AudioNode<'_>, _, cx| {
+        clip.play_button(cx).child("▶ Play")
+    })
+}
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(gpdoc_plugin_paragraph::paragraph())
+    .plugin(audio(Default::default()).with_view(player))
+    .build()?;
+```
+
+The play button opens the clip in the system handler. It resolves relative paths against the editor's media base URL and activates HTTP(S) sources. Use `clip.source()` and `clip.slot.node.attrs` for an application-owned player.
+
+## Settings
+
+Pass an `AudioOptions` value to `audio(options)` to configure the schema and playback defaults.
+
+### `placement`
+
+`Placement::Block` by default. Choose `Inline` to place the node inside a paragraph.
+
+```rust
+audio(AudioOptions { placement: gpdoc_plugin::core::Placement::Inline, ..Default::default() })
+```
+
+### `allow_base64`
+
+Defaults to `false`. Enable this to accept base64 audio data URLs as sources.
+
+```rust
+audio(AudioOptions { allow_base64: true, ..Default::default() })
+```
+
+### `controls`
+
+Defaults to `true`. Stores whether the player should display playback controls.
+
+```rust
+audio(AudioOptions { controls: false, ..Default::default() })
+```
+
+### `autoplay`
+
+Defaults to `false`. Requests playback when the clip loads.
+
+```rust
+audio(AudioOptions { autoplay: true, ..Default::default() })
+```
+
+### `repeat`
+
+Defaults to `false`. Sets the saved `loop` flag on new audio nodes.
+
+```rust
+audio(AudioOptions { repeat: true, ..Default::default() })
+```
+
+### `muted`
+
+Defaults to `false`. Sets the initial mute state for new clips.
+
+```rust
+audio(AudioOptions { muted: true, ..Default::default() })
+```
+
+### `preload`
+
+Defaults to the string `"metadata"`. Set it to `"none"` to request that the player defer loading.
+
+```rust
+audio(AudioOptions { preload: "none".into(), ..Default::default() })
+```
+
+### `disable_remote_playback`
+
+Defaults to `false`. Sets the `disableremoteplayback` flag for players that support remote playback.
+
+```rust
+audio(AudioOptions { disable_remote_playback: true, ..Default::default() })
+```
+
+## Commands
+
+### `setAudio`
+
+Inserts at the caret or replaces the current selection. Supply `src` as an HTTP(S) URL or a path starting with `/`, `./`, or `../`. With `allow_base64` enabled, the command also accepts audio data URLs. An unsupported source returns `CommandOutcome::NotApplicable`.
+
+```rust
+editor.run(gpdoc_plugin_audio::Set {
+    src: "./media/interview.ogg".into(),
+    ..Default::default()
+})?;
+```
+
+Override config defaults for a single clip with the boolean attributes `controls`, `autoplay`, `loop`, `muted`, and `disableremoteplayback`, or with the string `preload`. The optional strings `controlslist` and `crossorigin` accept null and are omitted by default.
+
+Pasting a web URL ending in a recognized suffix such as `.mp3` or `.ogg` also inserts an audio node. GPUI opens playback in the system handler. Use `Editor::set_media_base_url` to resolve relative sources.
+
+## Source code
+
+[audio/src/lib.rs](/source/plugins/audio/src/lib.rs.txt)

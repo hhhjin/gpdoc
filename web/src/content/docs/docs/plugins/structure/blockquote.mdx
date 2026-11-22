@@ -1,0 +1,105 @@
+---
+title: Blockquote
+description: Wrap one or more selected blocks in a quote.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`blockquote()` wraps one or more blocks in a quote. The wrapped blocks keep their text and structure.
+
+## Try it
+
+<PluginExample plugin="blockquote" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-blockquote
+```
+
+Register `blockquote()` alongside `paragraph()`. A quote takes no attributes and holds one or more child blocks.
+
+## Wrap a paragraph
+
+In a [Quickstart project](/docs/quickstart/), wrap a paragraph, then unwrap it again.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_blockquote::blockquote;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(blockquote())
+    .build()?;
+let paragraph = Node::text("paragraph", "The launch is on Friday.");
+let mut editor = Editor::from_document(&config, vec![paragraph.clone()])?;
+
+editor.run(gpdoc_plugin_blockquote::Set)?;
+assert_eq!(editor.document().blocks()[0].kind, "blockquote");
+
+editor.run(gpdoc_plugin_blockquote::Unset)?;
+assert_eq!(editor.document().blocks(), &[paragraph]);
+```
+
+## Commands
+
+### `setBlockquote`
+
+Wrap the selected sibling blocks in a single quote. A caret targets its paragraph. A selection spanning parts of two paragraphs includes both whole paragraphs. A gap selection supplies no blocks to wrap.
+
+```rust
+editor.run(gpdoc_plugin_blockquote::Set)?;
+```
+
+### `unsetBlockquote`
+
+Remove the nearest quote that contains the entire selection. Its child blocks remain in order.
+
+```rust
+editor.run(gpdoc_plugin_blockquote::Unset)?;
+```
+
+### `toggleBlockquote`
+
+Unwrap an enclosing quote when possible. Otherwise, wrap the selected blocks. Use this command for a single **Quote** button.
+
+```rust
+editor.run(gpdoc_plugin_blockquote::Toggle)?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Mod + Shift + B** | Toggle the quote around the selection. |
+
+## Start a quote while typing
+
+Type `>` followed by a space at the start of a paragraph. The editor removes the marker and wraps the paragraph.
+
+## Compose a GPUI view
+
+Blockquotes display their editable children in document order by default. To customize the layout, enable `gpui` on `gpdoc-plugin-blockquote` and attach a view using `gpdoc::PluginViewExt`.
+
+```rust
+.plugin(blockquote().with_view(views::quote))
+```
+
+In `views.rs`, place the editable content once. The content contains the original editable blocks, including nested lists and quotations.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_blockquote::quote_block;
+use gpui::{div, prelude::*, px};
+
+pub fn quote() -> ViewPlugin {
+    quote_block(|block, _, _| {
+        div().border_l_2().pl(px(12.)).child(block.content)
+    })
+}
+```
+
+## Source code
+
+[blockquote/src/lib.rs](/source/plugins/blockquote/src/lib.rs.txt)

@@ -1,0 +1,62 @@
+---
+title: Nodes, marks, and attributes
+description: Give a caption a default label and mark part of its text as a figure reference.
+---
+
+A caption occupies a block in the document. A figure reference can cover just the words “Figure 1” inside that block. Use a node for the caption and a mark for the reference.
+
+## Extend the caption schema
+
+In the crate from [Create your first plugin](/docs/plugins/custom/first-plugin/), replace the imports and the `caption` function in `src/lib.rs` with this definition.
+
+```rust
+use gpdoc_plugin::prelude::*;
+
+pub fn caption() -> Plugin {
+    Plugin::new("caption", |p| {
+        let labels = AttrSpecs::from([(
+            "label".into(),
+            AttrSpec::with_default(AttrType::String, Value::from("Figure")),
+        )]);
+        p.node(NodeSpec::block("caption").group("block").content("inline*").attrs(labels));
+
+        let targets = AttrSpecs::from([("target".into(), AttrSpec::required(AttrType::String))]);
+        p.mark(MarkSpec::new("figureRef").attrs(targets));
+    })
+}
+```
+
+The default root accepts `block+`, so a caption in the `block` group can appear beside a paragraph. Inside a caption, `inline*` allows text, inline nodes, or an empty caption. A nested paragraph would fail validation.
+
+The schema supplies `"Figure"` when the caption has no label. Each `figureRef` mark needs an explicit string target. A GPUI mark view can read this target and style the reference.
+
+## Open a caption with a marked reference
+
+Create `tests/schema.rs`. The first text node carries the reference. The second text node is plain.
+
+```rust
+use gpdoc::{Editor, EditorConfig};
+use gpdoc_plugin::prelude::*;
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_writing::caption;
+
+#[test]
+fn caption_with_a_reference() -> Result<(), Box<dyn std::error::Error>> {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(caption())
+        .build()?;
+    let source = r#"{"type":"doc","content":[{"type":"caption","content":[
+        {"type":"text","text":"Figure 1","marks":[{"type":"figureRef","attrs":{"target":"fig-1"}}]},
+        {"type":"text","text":" shows the result."}
+    ]}]}"#;
+    let editor = Editor::from_json(&config, source)?;
+    let block = &editor.document().blocks()[0];
+    assert_eq!(block.attrs["label"], "Figure");
+    assert_eq!(block.child(0).marks()[0].attrs["target"], "fig-1");
+    assert!(block.child(1).marks().is_empty());
+    Ok(())
+}
+```
+
+Run `cargo test --test schema`. To check the required attribute, remove the mark's `attrs` object from the input and run the test again. Opening the document now returns an error. Restore the target before continuing.

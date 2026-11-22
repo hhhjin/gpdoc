@@ -1,0 +1,93 @@
+---
+import { Icon } from "@astrojs/starlight/components";
+---
+
+<button type="button" data-theme-toggle aria-label="Dark mode" title="Toggle dark mode">
+  <Icon name="moon" class="moon" />
+  <Icon name="sun" class="sun" />
+</button>
+<span class="playground-shortcut">
+  <a class="playground-link" href="/playground/">Playground</a>
+</span>
+
+<style>
+  button {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--foreground);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: var(--accent);
+  }
+
+  .playground-shortcut {
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .playground-shortcut::before {
+    content: "";
+    height: 1rem;
+    border-inline-end: 1px solid var(--sl-color-gray-5);
+  }
+
+  .playground-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding-inline: 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .playground-link:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  :global([data-theme="light"]) .sun,
+  :global([data-theme="dark"]) .moon {
+    display: none;
+  }
+</style>
+
+<script>
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]");
+  const storageKey = "starlight-theme";
+
+  function updateButtons() {
+    for (const button of buttons) {
+      button.setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+    }
+  }
+
+  updateButtons();
+  for (const button of buttons) {
+    button.addEventListener("click", () => {
+      const theme = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = theme;
+      localStorage.setItem(storageKey, theme);
+      updateButtons();
+    });
+  }
+
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ({ matches }) => {
+    if (!localStorage.getItem(storageKey)) {
+      root.dataset.theme = matches ? "dark" : "light";
+      updateButtons();
+    }
+  });
+</script>

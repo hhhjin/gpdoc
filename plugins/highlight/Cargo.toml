@@ -1,0 +1,15 @@
+[package]
+name = "gpdoc-plugin-highlight"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Highlight plugin for the gpdoc rich-text editor"
+
+[features]
+gpui = ["dep:gpdoc", "dep:svgtypes"]
+
+[dependencies]
+gpdoc = { workspace = true, features = ["gpui"], optional = true }
+svgtypes = { version = "0.15", optional = true }
+gpdoc-plugin.workspace = true

@@ -1,0 +1,61 @@
+---
+title: Slash command
+description: Choose a block command by typing a slash at the start of a top-level paragraph.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+Type `/` at the start of a top-level paragraph to open the block menu. Filter the choices by typing the beginning of a label or alias.
+
+## Try it
+
+Click the empty paragraph and type `/h1`. Press **Enter**, then type a title in the new heading.
+
+<ViewPluginExample plugin="slash-command" title="Slash command example" />
+
+## Register your commands
+
+Enable the `gpui` feature on `gpdoc-plugin-slash-command`. Register `slash_commands(entries)` to use the default GPUI list. The default menu displays matching command labels and marks the active row. Each item binds a command supplied by another plugin. This example adds a heading command to the [Quickstart editor](/docs/quickstart/#configure-the-editor).
+
+```rust
+use gpdoc_plugin_heading::{heading, Level, Set};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_slash_command::{SlashCommand, slash_commands};
+
+let entries = [SlashCommand {
+    id: "heading.h1",
+    label: "Heading 1",
+    aliases: &["h1"],
+    command: gpdoc::StoredCommand::new(Set(Level::H1)),
+}];
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(heading())
+    .plugin(slash_commands(entries))
+    .build()?;
+```
+
+To customize the menu, import `gpdoc::PluginViewExt`, declare `mod menus;`, and register `slash_commands(entries).with_view(menus::slash_menu)`. Put the view in `menus.rs`. The popover follows the caret. The list keeps the active item visible, and each row handles click-to-accept while the editor retains keyboard focus.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_slash_command::{SlashMenu, slash_picker};
+use gpui::{prelude::*, rgb};
+
+pub fn slash_menu() -> ViewPlugin {
+    slash_picker(|menu: SlashMenu, _, _| {
+        menu.popover(menu.list(6, |row| {
+            row.element()
+                .when(row.is_active(), |el| el.bg(rgb(0xdde9f8)))
+                .child(row.value.label)
+        }).bg(rgb(0xffffff)))
+    })
+}
+```
+
+Type `/h1` and press Enter to apply the level-one heading. To contribute entries from a plugin, register its catalog with `PluginSpec::metadata(SlashCatalog::new(entries))`. Register `slash_commands([])` once to display the catalogs with the default list, or attach the same custom menu with `.with_view(menus::slash_menu)`.
+
+## Source code
+
+[slash-command/src/lib.rs](/source/plugins/slash-command/src/lib.rs.txt)

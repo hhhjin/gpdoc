@@ -1,0 +1,9 @@
+name = "gpdoc-editor"
+compatibility_date = "2026-11-19"
+
+[[routes]]
+pattern = "gpdoc.dev"
+custom_domain = true
+
+[assets]
+directory = "./dist"

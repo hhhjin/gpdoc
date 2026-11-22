@@ -1,0 +1,81 @@
+---
+title: Typography
+description: Turn typed punctuation and symbols into typographic characters.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Typography converts patterns such as three periods, straight quotes, and `(c)` as the user types. Its input rules skip inline code and code blocks.
+
+## Try it
+
+<PluginExample plugin="typography" />
+
+## Install
+
+Run this from a [Quickstart project](/docs/quickstart/).
+
+```sh
+cargo add gpdoc-plugin-typography
+```
+
+## Convert typed punctuation
+
+With the paragraph plugin installed, type three periods in an empty paragraph to insert an ellipsis.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_typography::{typography, TypographyOptions};
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(typography(Default::default()))
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
+for _ in 0..3 {
+	editor.insert_text(".")?;
+}
+assert_eq!(editor.document().blocks(), [Node::text("paragraph", "…")]);
+```
+
+## Settings
+
+### Right-to-left quotes
+
+Set `TypographyOptions::rtl_quotes` to reverse the opening and closing quote characters. The default is `false`.
+
+```rust
+let quotes = typography(TypographyOptions { rtl_quotes: true, ..Default::default() });
+```
+
+### Rule replacements
+
+The default `replacements` map is empty. Insert `Some(String)` to override a rule or `None` to disable it. Missing keys use their built-in replacements.
+
+```rust
+let mut options = TypographyOptions::default();
+options.replacements.insert("ellipsis".into(), None);
+options.replacements.insert("rightArrow".into(), Some("⇒".into()));
+let punctuation = typography(options);
+```
+
+## Typing rules
+
+### Built-in rule names
+
+The `typography` input rule checks the text leading up to the caret as you type. Use the following keys in the replacement map.
+
+| Rule keys | Built-in replacements in the same order |
+| --- | --- |
+| `emDash`, `ellipsis` | —, … |
+| `openDoubleQuote`, `closeDoubleQuote`, `openSingleQuote`, `closeSingleQuote` | “, ”, ‘, ’ |
+| `leftArrow`, `rightArrow`, `laquo`, `raquo` | ←, →, «, » |
+| `copyright`, `trademark`, `servicemark`, `registeredTrademark` | ©, ™, ℠, ® |
+| `oneHalf`, `oneQuarter`, `threeQuarters` | ½, ¼, ¾ |
+| `plusMinus`, `notEqual`, `multiplication` | ±, ≠, × |
+| `superscriptTwo`, `superscriptThree` | ², ³ |
+
+## Source code
+
+[typography/src/lib.rs](/source/plugins/typography/src/lib.rs.txt)

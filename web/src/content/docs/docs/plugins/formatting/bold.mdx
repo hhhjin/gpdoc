@@ -1,0 +1,88 @@
+---
+title: Bold
+description: Mark selected text or the next typed characters as bold.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Bold adds the `bold` mark. Use it for text you want readers to spot, such as a new term or the key phrase in a release note.
+
+## Try it
+
+<PluginExample plugin="bold" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-bold
+```
+
+Register `gpdoc_plugin_bold::bold()` alongside `paragraph()`.
+
+## Example
+
+The first paragraph starts at document position `1`. The range `12..25` selects `release notes`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_bold::bold;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(bold())
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Review the release notes before Friday.")])?;
+	editor.select(Selection::Text {
+		anchor: DocPos(12),
+		head: DocPos(25),
+	})?;
+
+	editor.run(gpdoc_plugin_bold::Toggle)?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The words `Review the` and `before Friday.` keep their original weight.
+
+## Commands
+
+These commands take no arguments. Select text to change its formatting, or place the caret where you want to start typing. `editor.run` returns `Result<CommandOutcome, Error>`. A handled command returns `Applied(AppliedChange)`. Set and toggle return `NotApplicable` if no text can take the mark.
+
+### `setBold`
+
+Apply bold to the selection or to the next characters typed at the caret.
+
+```rust
+editor.run(gpdoc_plugin_bold::Set)?;
+```
+
+### `toggleBold`
+
+Switch bold off when the whole eligible selection has the mark. On a mixed selection, apply it throughout.
+
+```rust
+editor.run(gpdoc_plugin_bold::Toggle)?;
+```
+
+### `unsetBold`
+
+Clear bold from the selection or turn it off for subsequent typing.
+
+```rust
+editor.run(gpdoc_plugin_bold::Unset)?;
+```
+
+## Keyboard shortcuts
+
+Toggle bold with **Command + B** on macOS or **Ctrl + B** on Windows and Linux.
+
+Typing `**release notes**` or `__release notes__` applies bold.
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-bold`. In a GPUI editor, `bold()` uses bold weight. To supply your own formatter, import `gpdoc::PluginViewExt` and register `bold().with_view(my_bold_view)`.

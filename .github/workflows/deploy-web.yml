@@ -1,0 +1,44 @@
+name: Deploy web
+
+on:
+  workflow_call:
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: deploy-web-main
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the matching wasm-bindgen CLI
+        run: |
+          version=$(bun -e 'console.log(Bun.TOML.parse(await Bun.file("../Cargo.lock").text()).package.find(p => p.name === "wasm-bindgen").version)')
+          cargo install wasm-bindgen-cli --locked --version "=$version"
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run wrangler deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -1,0 +1,14 @@
+[package]
+name = "gpdoc-plugin-trailing-node"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Trailing Node plugin for the gpdoc editor"
+
+[dependencies]
+gpdoc-plugin.workspace = true
+
+[dev-dependencies]
+gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-heading.workspace = true

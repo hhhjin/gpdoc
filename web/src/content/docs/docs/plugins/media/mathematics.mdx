@@ -1,0 +1,150 @@
+---
+title: Mathematics
+description: Insert inline or standalone LaTeX formulas.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`mathematics()` adds inline and standalone formula nodes. Both store the original LaTeX in a `latex` attribute so the host can render it or let users edit the source.
+
+## Try it
+
+<PluginExample plugin="mathematics" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-mathematics
+```
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), insert an inline formula at the end of the first paragraph.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
+use gpdoc_plugin_mathematics::mathematics;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(mathematics())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Area: ")])?;
+editor.select(Selection::caret(DocPos(7)))?;
+editor.run(gpdoc_plugin_mathematics::InsertInline {
+    latex: r"\pi r^2".into(),
+    pos: None,
+})?;
+
+assert_eq!(editor.document().node_at(DocPos(7)).unwrap().kind, "inlineMath");
+```
+
+The paragraph text starts at document position `1`. The six characters in `Area: ` put the insertion point at `7`. The Rust raw string preserves the backslash in `\pi`.
+
+## Native view
+
+Enable the `gpui` feature. The default mathematics view typesets inline and block formulas.
+
+```rust
+use gpdoc_plugin_mathematics::mathematics;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(gpdoc_plugin_paragraph::paragraph())
+    .plugin(mathematics())
+    .build()?;
+```
+
+The standalone `inline_math()` and `block_math()` plugins each install their own formula view. For an application-owned control over both typeset formulas, return `formula_controls(render)` from your view function. The renderer receives a `FormulaNode` with `latex()`, `is_display()`, and `set_latex(source)`. Apply the returned transaction with `Editor::apply_node_view` when the user saves the new source. The standalone plugins provide corresponding `inline_formula_controls` and `block_formula_controls` factories.
+
+## Settings
+
+### Formula types
+
+`mathematics()` registers inline and block formulas. Register `inline_math()` or `block_math()` on its own to install just that node type, its commands, and its input rule.
+
+```rust
+use gpdoc::EditorConfig;
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(gpdoc_plugin_mathematics::inline_math())
+    .build()?;
+```
+
+GPUI typesets supported LaTeX and displays the stored source when it cannot typeset an expression.
+
+## Commands
+
+All six commands accept an optional nonnegative integer `pos` in document coordinates. Omitting it targets the start of the selection. For update and delete, supply the start position of the existing formula. A different node type at that position returns `CommandOutcome::NotApplicable`.
+
+### `insertInlineMath`
+
+Creates a formula inside a paragraph at the target position. Pass a nonempty `latex` string.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::InsertInline {
+    latex: "x^2".into(),
+    pos: None,
+})?;
+```
+
+### `updateInlineMath`
+
+Replaces the source of an existing `inlineMath` node. The optional `latex` string defaults to its current source.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::UpdateInline {
+    latex: Some("x^3".into()),
+    pos: Some(7),
+})?;
+```
+
+### `deleteInlineMath`
+
+Removes the `inlineMath` node at the target position. The command takes only the optional `pos`.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::DeleteInline {
+    pos: Some(7),
+})?;
+```
+
+### `insertBlockMath`
+
+Creates a formula on its own line at the target position. Pass a nonempty `latex` string.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::InsertBlock {
+    latex: "x^2".into(),
+    pos: None,
+})?;
+```
+
+### `updateBlockMath`
+
+Replaces the source of an existing `blockMath` node. The optional `latex` string defaults to its current source.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::UpdateBlock {
+    latex: Some("x^3".into()),
+    pos: Some(0),
+})?;
+```
+
+### `deleteBlockMath`
+
+Removes the `blockMath` node at the target position. The command takes only the optional `pos`.
+
+```rust
+editor.run(gpdoc_plugin_mathematics::DeleteBlock {
+    pos: Some(0),
+})?;
+```
+
+## Typing shortcuts
+
+Type `$$x^2$$` inside a paragraph for inline math. Start an empty paragraph and type `$$$x^2$$$` for block math. The closing delimiter converts the expression.
+
+## Source code
+
+[mathematics/src/lib.rs](/source/plugins/mathematics/src/lib.rs.txt)

@@ -1,0 +1,38 @@
+---
+title: Focus
+description: Highlight the block containing the selection anchor while the editor has focus.
+---
+
+import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
+
+## Try it
+
+Click either quoted paragraph. The highlight follows the paragraph containing the caret.
+
+<ViewPluginExample plugin="focus" title="Focus example" />
+
+## Register the plugin
+
+In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+
+```sh
+cargo add gpdoc-plugin-focus
+```
+
+```rust
+use gpdoc_plugin_focus::{FocusMode, focus};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(focus(FocusMode::Deepest))
+    .build()?;
+```
+
+Pass your own painter to `.with_view(...)` to change the appearance. It receives the selected block’s bounds, window, and app. With `FocusMode::All`, the plugin calls it once for each visible enclosing block.
+
+Place the caret in a paragraph inside a blockquote. `FocusMode::Deepest` highlights the paragraph. Use `Shallowest` for the outermost enclosing block or `All` to paint each enclosing block. Moving focus out of the editor hides the highlight.
+
+## Source code
+
+[focus/src/lib.rs](/source/plugins/focus/src/lib.rs.txt)

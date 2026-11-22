@@ -1,0 +1,126 @@
+---
+title: Link
+description: Add links to selected text or detect addresses as users type and paste.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Link adds the `link` mark. It stores a destination in `href` and can also store a link title, target, relation, and class.
+
+## Try it
+
+<PluginExample plugin="link" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-link
+```
+
+Build a config with `gpdoc::EditorConfig::builder().plugins([paragraph(), link(LinkOptions::default())]).build()?`.
+
+## Example
+
+The first paragraph starts at document position `1`. The range `1..20` selects `Read the Quickstart`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_link::{link, LinkOptions};
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(link(Default::default()))
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Read the Quickstart to open an editor.")])?;
+	editor.select(Selection::Text {
+		anchor: DocPos(1),
+		head: DocPos(20),
+	})?;
+
+	editor.run(gpdoc_plugin_link::Set::new("/docs/quickstart/"))?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The reader sees `Read the Quickstart` as the link label. Its destination is available in the mark attributes.
+
+## Settings
+
+Pass a `LinkOptions` value to `link(options)`.
+
+### `autolink`
+
+Detect an address when the user types a following space. When enabled, the link mark also extends to text typed at its end. Boolean, default `true`.
+
+```rust
+let links = link(LinkOptions { autolink: false, ..Default::default() });
+```
+
+### `markdown_links`
+
+Recognize Markdown such as `[Quickstart](/docs/quickstart/)` during typing and paste. Boolean, default `false`.
+
+```rust
+let links = link(LinkOptions { markdown_links: true, ..Default::default() });
+```
+
+### `link_on_paste`
+
+When the user selects text and pastes one URL, keep the selected words as the link label. Boolean, default `true`.
+
+```rust
+let links = link(LinkOptions { link_on_paste: false, ..Default::default() });
+```
+
+### `default_protocol`
+
+Supply the scheme when a detected domain has none. String, default `"http"`.
+
+```rust
+let links = link(LinkOptions { default_protocol: "https".into(), ..Default::default() });
+```
+
+### `protocols`
+
+Allow additional schemes. The default is an empty `Vec<String>`. Built-in schemes are `http`, `https`, `ftp`, `ftps`, `mailto`, `tel`, `callto`, `sms`, `cid`, and `xmpp`.
+
+```rust
+let links = link(LinkOptions { protocols: vec!["myapp".into()], ..Default::default() });
+```
+
+## Commands
+
+Link attributes accept strings or `null`. On a new mark, `href`, `class`, and `title` default to `null`, `target` to `"_blank"`, and `rel` to `"noopener noreferrer nofollow"`. `editor.run` returns `Result<CommandOutcome, Error>`. Set and toggle return `NotApplicable` for a disallowed scheme.
+
+### `setLink`
+
+Apply a link to selected words or update their existing link. Pass a relative path or an allowed URI in `href`.
+
+```rust
+editor.run(gpdoc_plugin_link::Set::new("/docs/quickstart/"))?;
+```
+
+### `toggleLink`
+
+Remove the link if all eligible text matches the supplied attributes. Otherwise apply the link. With a caret inside a link, the command removes the contiguous link.
+
+```rust
+editor.run(gpdoc_plugin_link::Toggle::new("/docs/quickstart/"))?;
+```
+
+### `unsetLink`
+
+Remove the link but keep the label. At a caret inside a link, the command clears the entire contiguous link.
+
+```rust
+editor.run(gpdoc_plugin_link::Unset)?;
+```
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-link`. In a GPUI editor, `link(options)` underlines links in the inherited text color. To enable double-click and primary-modifier click, import `gpdoc::PluginViewExt` and use `link(options).with_view(|| [link_format(), link_activation()])`. Add `link_popover(render)` to the array for controls at the caret. Its callback receives the link attributes, document range and editor handle.

@@ -1,0 +1,30 @@
+---
+import ExamplePanel from "./ExamplePanel.astro";
+
+const text = "Give the release notes a little emphasis.";
+---
+
+<ExamplePanel
+  kind="format"
+  title="Format a selection"
+  hint="Pick a phrase and toggle bold or italic on it."
+>
+  <div class="example-controls">
+    <label class="example-label">
+      Text to format
+      <select name="selection">
+        <option value="release notes">release notes</option>
+        <option value="emphasis">emphasis</option>
+        <option value={text}>Entire sentence</option>
+      </select>
+    </label>
+    <button type="button" data-bold aria-pressed="false">Bold</button>
+    <button type="button" data-italic aria-pressed="false">Italic</button>
+  </div>
+  <div class="example-label">
+    Document
+    <div class="example-document" data-preview data-text={text}>
+      Give the <mark>release notes</mark> a little emphasis.
+    </div>
+  </div>
+</ExamplePanel>

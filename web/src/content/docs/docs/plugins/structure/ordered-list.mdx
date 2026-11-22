@@ -1,0 +1,103 @@
+---
+title: Ordered list
+description: Turn paragraphs into a numbered list and set its starting number.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`ordered_list()` wraps paragraphs in a numbered list. Its `start` attribute controls the number of the first item.
+
+## Try it
+
+<PluginExample plugin="ordered-list" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-ordered-list gpdoc-plugin-list-item
+```
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), register the list and its item type. Start numbering a list at 4.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node, Value};
+use gpdoc_plugin_list_item::list_item;
+use gpdoc_plugin_ordered_list::ordered_list;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(list_item())
+    .plugin(ordered_list())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Publish the release")])?;
+editor.run(gpdoc_plugin_ordered_list::Toggle { start: Some(4), ..Default::default() })?;
+
+assert_eq!(editor.document().blocks()[0].attrs["start"], Value::from(4));
+```
+
+## Settings
+
+Register `gpdoc_plugin_ordered_list::ordered_list()` with `paragraph()` and `list_item()`. Pass the following attributes when creating a list.
+
+### `start`
+
+The first number in the list. Defaults to integer `1`. Pass `4` to label the first two items 4 and 5.
+
+### `type`
+
+Optional string on the list node, default `null`. The typed-marker rule continues a preceding list when its type is `null` or `"1"` and the typed number is next in sequence.
+
+## Commands
+
+### `toggleOrderedList`
+
+Wrap the current or selected paragraphs. Inside an ordered list, lift the selected items. Inside a compatible list of another type, convert it to an ordered list.
+
+```rust
+editor.run(gpdoc_plugin_ordered_list::Toggle { start: Some(4), ..Default::default() })?;
+```
+
+### `wrapInOrderedList`
+
+Wrap each selected paragraph in a list item. A preceding ordered list absorbs the new items and supplies their numbering.
+
+```rust
+editor.run(gpdoc_plugin_ordered_list::Wrap::default())?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Command |
+| --- | --- |
+| **Mod + Shift + 7** | `toggleOrderedList` |
+
+At the start of a paragraph, type a number, a period, and a space. After a list containing items 4 and 5, typing `6.` followed by a space continues that list. Typing `1.` followed by a space starts a separate list.
+
+## Compose a GPUI view
+
+An ordered list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic numbers, which start at the list’s `start` attribute. To customize the layout, enable `gpui` on `gpdoc-plugin-ordered-list` and attach a view using `gpdoc::PluginViewExt`.
+
+```rust
+.plugin(ordered_list().with_view(views::numbered))
+```
+
+In `views.rs`, place the editable content once. Register the list item renderer to display numbers from the ordered list’s starting counter.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_ordered_list::ordered_list_body;
+use gpui::{div, prelude::*, px};
+
+pub fn numbered() -> ViewPlugin {
+    ordered_list_body(|block, _, _| {
+        div().pl(px(16.)).child(block.content)
+    })
+}
+```
+
+## Source code
+
+[ordered-list/src/lib.rs](/source/plugins/ordered-list/src/lib.rs.txt)

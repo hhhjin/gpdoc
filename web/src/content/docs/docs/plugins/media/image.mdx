@@ -1,0 +1,98 @@
+---
+title: Image
+description: Insert an image with alternative text and optional dimensions.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`image()` adds a block image with a source, alternative text, optional title, and optional dimensions. Use `image_with_placement(Placement::Inline)` for images inside text.
+
+## Try it
+
+<PluginExample plugin="image" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-image
+```
+
+## Example
+
+In a [Quickstart project](/docs/quickstart/), insert an image using a path your host app can resolve.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc_plugin_image::image;
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(image())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
+editor.run(gpdoc_plugin_image::Set {
+    src: "images/swallow.png".into(),
+    alt: Some("A swallow in flight".into()),
+    width: std::num::NonZeroU32::new(240),
+    ..Default::default()
+})?;
+
+assert_eq!(editor.document().blocks()[0].kind, "image");
+```
+
+The first block now holds the source, description, and width. The value `240` sets the display width in pixels. The host needs an asset at `images/swallow.png` to draw the picture.
+
+## Native view
+
+Enable the `gpui` feature. The default image view draws the resource using its stored dimensions and displays the alt text while the resource is unavailable.
+
+```rust
+use gpdoc_plugin_image::image;
+
+let config = gpdoc::EditorConfig::builder()
+    .plugin(gpdoc_plugin_paragraph::paragraph())
+    .plugin(image())
+    .build()?;
+```
+
+For a custom view, pass your own named function to `with_view`. Return `image_controls(render)` from that function to place controls over the projected image. The renderer receives an `ImageNode` with the image source, alt text and dimensions. Its `resize(width, height)` method prepares an undoable transaction. Pass the transaction to `Editor::apply_node_view` when the user confirms the new dimensions. A dimension set to `None` follows the intrinsic aspect ratio.
+
+## Settings
+
+### `placement`
+
+`image()` uses `Placement::Block`. To keep pictures inline with text, register `image_with_placement(placement: Placement)` in your config.
+
+```rust
+let image = gpdoc_plugin_image::image_with_placement(gpdoc_plugin::core::Placement::Inline);
+```
+
+## Commands
+
+### `setImage`
+
+Inserts an image at the caret or replaces the selection. Supply the image source and any optional display attributes.
+
+```rust
+editor.run(gpdoc_plugin_image::Set {
+    src: "images/swallow.png".into(),
+    ..Default::default()
+})?;
+```
+
+| Argument | Value |
+| --- | --- |
+| `src` | Resource path or URL string. A nonempty value enables image rendering. |
+| `alt`, `title` | Strings. GPUI labels the node with the first nonempty value, falling back to `"image"`. |
+| `width`, `height` | Positive pixel sizes (`Option<NonZeroU32>`). |
+
+GPUI can display app assets and HTTP(S) URLs through the host's configured HTTP client. Supply your own resize controls for pointer-driven resizing.
+
+## Typing shortcuts
+
+At the start of a paragraph, type `![A swallow](images/swallow.png)`. The closing parenthesis converts the bracketed text to `alt` and the path to `src`.
+
+## Source code
+
+[image/src/lib.rs](/source/plugins/image/src/lib.rs.txt)

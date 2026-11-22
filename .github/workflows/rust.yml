@@ -1,0 +1,20 @@
+name: Rust
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo fmt --all -- --check
+      - name: Install GPUI's Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
+      - run: cargo test --workspace --locked
+      - name: Test GPUI plugin interactions
+        run: cargo test --locked -p gpdoc-gpui-tests --features native-tests --test plugins

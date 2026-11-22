@@ -1,0 +1,85 @@
+---
+const playgroundUrl = `${import.meta.env.BASE_URL}playground/`;
+---
+
+<gpdoc-editor-example class="not-content">
+  <div class="example-actions">
+    <button type="button" aria-controls="gpui-editor-preview" hidden>Start editor</button>
+    <a href={playgroundUrl}>Open full playground</a>
+  </div>
+  <div id="gpui-editor-preview"></div>
+  <template>
+    <iframe src={playgroundUrl} title="gpdoc GPUI demo"></iframe>
+  </template>
+</gpdoc-editor-example>
+
+<script>
+  class GpdocEditorExample extends HTMLElement {
+    connectedCallback() {
+      const start = this.querySelector("button");
+      const preview = this.querySelector("#gpui-editor-preview");
+      const template = this.querySelector("template");
+      if (!start || !preview || !template) return;
+
+      start.hidden = false;
+      start.onclick = () => {
+        preview.replaceChildren(template.content.cloneNode(true));
+        start.textContent = "Reset editor";
+      };
+    }
+  }
+
+  customElements.define("gpdoc-editor-example", GpdocEditorExample);
+</script>
+
+<style>
+  gpdoc-editor-example {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+  }
+
+  .example-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding: 0.75rem;
+    background-color: var(--sl-color-gray-6);
+    font-size: var(--sl-text-sm);
+  }
+
+  button {
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--sl-color-text-accent);
+    border-radius: 0.45rem;
+    background-color: var(--sl-color-text-accent);
+    color: var(--sl-color-black);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: var(--sl-color-white);
+    border-color: var(--sl-color-white);
+  }
+
+  a {
+    color: var(--sl-color-text-accent);
+  }
+
+  a:hover {
+    color: var(--sl-color-white);
+  }
+
+  iframe {
+    display: block;
+    width: 100%;
+    height: clamp(19rem, 55vh, 28rem);
+    border: 0;
+    border-top: 1px solid var(--sl-color-gray-5);
+    background-color: white;
+  }
+</style>

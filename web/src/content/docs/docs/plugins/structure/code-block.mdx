@@ -1,0 +1,105 @@
+---
+title: Code block
+description: Store multiline code with an optional language.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+`code_block()` registers a text block for code. It keeps its language in the `language` attribute and stores the source as plain text.
+
+## Try it
+
+<PluginExample plugin="code-block" />
+
+## Install
+
+```sh
+cargo add gpdoc-plugin-code-block
+```
+
+Register `code_block()` with `paragraph()` so users can switch from code back to body text.
+
+## Convert a paragraph to Rust code
+
+In a [Quickstart project](/docs/quickstart/), convert a paragraph to a Rust code block.
+
+```rust
+use gpdoc::{Editor, EditorConfig, Node, Value};
+use gpdoc_plugin_code_block::{Language, code_block};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(code_block())
+    .build()?;
+let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "fn main() {}")])?;
+editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
+
+let block = &editor.document().blocks()[0];
+assert_eq!(block.kind, "codeBlock");
+assert_eq!(block.attrs["language"], Value::String("rust".into()));
+```
+
+## Settings
+
+### `language`
+
+Pass `Language::Set(name)` to select a language, `Language::Keep` to preserve the existing language, or `Language::Clear` to remove it. A new block defaults to plain text.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Set(Language::Clear))?;
+```
+
+## Commands
+
+### `setCodeBlock`
+
+Convert selected text blocks where the parent permits code. The conversion removes text formatting, turns inline line breaks into newlines, and removes other inline nodes such as mentions.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
+```
+
+### `toggleCodeBlock`
+
+Switch to paragraphs when every selected block is code and matches the supplied attributes. `Language::Keep` matches any code-block language. Otherwise, convert eligible text blocks to code.
+
+```rust
+editor.run(gpdoc_plugin_code_block::Toggle(Language::Keep))?;
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Mod + Alt + C** | Toggle code formatting for the selected blocks. |
+
+## Start a code block while typing
+
+Start a paragraph with three backticks or three tildes and press Space. To choose a language, type a lowercase name after the fence, as in `~~~rust`, then press Space. The input rule consumes the fence. To color the source, see [Code block with syntax highlighting](/docs/plugins/structure/code-block-lowlight/).
+
+## Compose a GPUI view
+
+Code blocks display editable lines using the editor’s typography by default. To customize the layout, enable `gpui` on `gpdoc-plugin-code-block` and attach a view using `gpdoc::PluginViewExt`.
+
+```rust
+.plugin(code_block().with_view(views::code))
+```
+
+In `views.rs`, place the editable content once. Read `block.node.attrs["language"]` when displaying the language of a code block.
+
+```rust
+use gpdoc::ViewPlugin;
+use gpdoc_plugin_code_block::code_block_body;
+use gpui::{div, prelude::*, px};
+
+pub fn code() -> ViewPlugin {
+    code_block_body(|block, _, _| {
+        div().font_family("monospace").p(px(8.)).child(block.content)
+    })
+}
+```
+
+## Source code
+
+[code-block/src/lib.rs](/source/plugins/code-block/src/lib.rs.txt)

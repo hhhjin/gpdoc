@@ -1,0 +1,40 @@
+---
+title: Transactions and plugin state
+description: Remember the last inserted snippet in one editor and reuse it in a second command.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import pluginSource from '../../../../../../../tests/plugins/tests/custom_plugin/main.rs?raw';
+import testSource from '../../../../../../../tests/plugins/tests/custom_plugin/tests.rs?raw';
+
+Extend [the snippet command](/docs/plugins/custom/commands/) with **Mod-Shift-J** to repeat the last snippet. Keep the last string in editor-local state so each open editor remembers its own snippet.
+
+## Commit the text and state together
+
+Replace `src/commands.rs` with the complete plugin below. Add `REPEAT_SNIPPET` to the existing `pub use commands::{...}` declaration in `src/lib.rs`.
+
+<Code code={pluginSource} lang="rust" title="src/commands.rs" />
+
+`insert_snippet` starts a transaction from the command context. It writes the new value of `LastSnippet` and pushes the text replacement into the same transaction. If the edit fails, the editor discards both changes.
+
+`repeatSnippet` reads the current value from the context. Until an insert succeeds, there is no value to repeat and the command returns `Ok(None)`. Once a snippet exists, both shortcuts use the same insertion handler.
+
+The editor stores one value per Rust type. A dedicated `LastSnippet` type gives this plugin its own slot. The editor's document undo history tracks the text edits. Undoing an insertion leaves the remembered snippet available.
+
+## Test repeat and undo
+
+Create `src/commands/tests.rs` for the `mod tests;` declaration above.
+
+<Code code={testSource} lang="rust" title="src/commands/tests.rs" />
+
+Run `cargo test`. The test checks repeat before the first insert, the text after two insertions, and what repeat can still insert after undo.
+
+## Share the writing plugins
+
+To let an app install both the caption and snippet plugins together, add this preset to `src/lib.rs`. An app can pass `writing_plugins()` alongside its paragraph plugin when assembling the config.
+
+```rust
+pub fn writing_plugins() -> Vec<Plugin> {
+    vec![caption(), snippets()]
+}
+```

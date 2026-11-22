@@ -1,0 +1,121 @@
+---
+title: Text alignment
+description: Align paragraphs, headings, or other configured blocks.
+---
+
+import PluginExample from "../../../../../components/PluginExample.astro";
+
+Text alignment adds the `textAlign` attribute to chosen block types. The default alignment values are `left`, `center`, `right`, and `justify`.
+
+## Try it
+
+<PluginExample plugin="text-align" />
+
+## Install
+
+From your [Quickstart project](/docs/quickstart/), add the plugin.
+
+```sh
+cargo add gpdoc-plugin-text-align
+```
+
+Add `gpdoc_plugin_text_align::text_align(["paragraph"])` to your editor config.
+
+## Example
+
+Place the caret at the start of the paragraph. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
+use gpdoc_plugin_text_align::text_align;
+use gpdoc_plugin_paragraph::paragraph;
+
+fn main() -> Result<(), Error> {
+	let config = EditorConfig::builder()
+	    .plugin(paragraph())
+	    .plugin(text_align(["paragraph"]))
+	    .build()?;
+	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "A note from the editor")])?;
+	editor.select(Selection::caret(DocPos(1)))?;
+
+	editor.run(gpdoc_plugin_text_align::Set("center".into()))?;
+	println!("{}", editor.document().blocks()[0].to_json());
+	Ok(())
+}
+```
+
+The whole paragraph moves to the center, even though the selection is a single caret.
+
+## Settings
+
+`text_align(types)` and `text_align_with_options(types, options: TextAlignOptions)` both create a text alignment plugin.
+
+### `types`
+
+Choose which blocks can store alignment. Supply an iterator of names (`impl IntoIterator<Item = impl Into<String>>`) for block types registered with your config. To align headings, register the [Heading plugin](/docs/plugins/structure/heading/) and include `"heading"` in the array.
+
+```rust
+let alignment = gpdoc_plugin_text_align::text_align(["paragraph", "heading"]);
+```
+
+### `alignments`
+
+Restrict the menu to supported values with `TextAlignOptions::alignments` (`Vec<String>`). Defaults to `left`, `center`, `right`, and `justify`.
+
+```rust
+use gpdoc_plugin_text_align::{text_align_with_options, TextAlignOptions};
+
+let alignment = text_align_with_options(["paragraph"], TextAlignOptions {
+    alignments: vec!["left".into(), "center".into()],
+    ..Default::default()
+});
+```
+
+### `default_alignment`
+
+Set the initial alignment and the value restored by reset. The default is `None` (`Option<String>`), stored as `null` on the block.
+
+```rust
+use gpdoc_plugin_text_align::{text_align_with_options, TextAlignOptions};
+
+let alignment = text_align_with_options(["paragraph"], TextAlignOptions {
+    default_alignment: Some("left".into()),
+    ..Default::default()
+});
+```
+
+## Commands
+
+`editor.run` returns `Result<CommandOutcome, Error>`. Set and toggle return `NotApplicable` for a missing or unsupported `textAlign` string. All three return `NotApplicable` if the selection contains no configured block.
+
+### `setTextAlign`
+
+Apply the requested alignment to each eligible block in the selection.
+
+```rust
+editor.run(gpdoc_plugin_text_align::Set("center".into()))?;
+```
+
+### `toggleTextAlign`
+
+Restore the default if the requested alignment covers the selection. Otherwise apply it.
+
+```rust
+editor.run(gpdoc_plugin_text_align::Toggle("center".into()))?;
+```
+
+### `unsetTextAlign`
+
+Restore the configured default on eligible blocks.
+
+```rust
+editor.run(gpdoc_plugin_text_align::Unset)?;
+```
+
+## Keyboard shortcuts
+
+Hold **Command + Shift** on macOS or **Ctrl + Shift** on Windows and Linux, then press **L** for left, **E** for center, **R** for right, or **J** for justified alignment.
+
+## Native appearance
+
+Enable the `gpui` feature on `gpdoc-plugin-text-align`. In a GPUI editor, `text_align(["paragraph"])` aligns paragraphs using their stored alignment. To supply your own formatter, import `gpdoc::PluginViewExt` and register `text_align(["paragraph"]).with_view(my_text_align_view)`.
