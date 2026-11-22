@@ -2,6 +2,9 @@
 name = "gpdoc-plugin-file-handler"
 version = "0.1.0"
 edition.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
 license.workspace = true
 readme.workspace = true
 description = "File handler plugin for gpdoc"

@@ -14,6 +14,9 @@ members = [
 edition = "2024"
 license = "MIT"
 readme = "README.md"
+documentation = "https://gpdoc.dev/docs/quickstart/"
+homepage = "https://gpdoc.dev"
+repository = "https://github.com/hhhjin/gpdoc"
 
 [workspace.dependencies]
 gpdoc-demo-fonts = { path = "crates/gpdoc/examples/editor/fonts" }

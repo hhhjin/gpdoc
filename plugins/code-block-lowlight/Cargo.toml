@@ -2,6 +2,9 @@
 name = "gpdoc-plugin-code-block-lowlight"
 version = "0.1.0"
 edition.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
 license.workspace = true
 readme.workspace = true
 description = "Code block lowlight plugin for the gpdoc rich-text editor"
