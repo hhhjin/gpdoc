@@ -1,5 +1,5 @@
 [workspace]
 # Publish the versions approved in a merged release PR.
 release_always = false
-# Contributors write release notes in each crate's CHANGELOG.md.
-changelog_update = false
+# Generate each crate's changelog in the release PR.
+changelog_update = true
