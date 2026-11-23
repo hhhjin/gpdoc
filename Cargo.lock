@@ -2387,6 +2387,7 @@ dependencies = [
  "gpui",
  "gpui-unofficial",
  "latex-rust",
+ "libc",
  "thiserror 2.0.21",
  "unicode-bidi",
  "unicode-segmentation",

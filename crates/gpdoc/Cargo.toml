@@ -21,10 +21,15 @@ url = { version = "2.5.9", optional = true }
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui = { workspace = true, optional = true, features = ["font-kit", "wayland", "x11"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# TODO: Remove this pin when published GPUI no longer pulls in xattr 0.2.3,
+# which uses libc::ENOATTR on Linux (https://github.com/zed-industries/zed/issues/67211).
+libc = { version = "=0.2.189", optional = true }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 gpui-browser = { workspace = true, optional = true }
 
 [features]
 default = ["gpui"]
-gpui = ["dep:gpui", "dep:gpui-browser", "dep:latex-rust", "dep:thiserror", "dep:unicode-bidi", "dep:unicode-segmentation", "dep:url"]
+gpui = ["dep:gpui", "dep:gpui-browser", "dep:latex-rust", "dep:libc", "dep:thiserror", "dep:unicode-bidi", "dep:unicode-segmentation", "dep:url"]
 native-tests = ["gpui", "gpui/test-support"]
