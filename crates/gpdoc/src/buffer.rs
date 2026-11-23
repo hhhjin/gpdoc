@@ -93,15 +93,17 @@ impl InputBuffer {
         Ok(outcome)
     }
 
-    pub(super) fn apply_node_view(&mut self, tx: gpdoc_core::Transaction) -> Result<(), Error> {
+    pub(super) fn apply_node_view(&mut self, tx: gpdoc_core::Transaction) -> Result<bool, Error> {
         if self.has_preedit() {
             return Err(Error::InvalidEdit(
                 "node view edit during composition".into(),
             ));
         }
-        let change = self.editor.apply(tx)?;
+        let Some(change) = self.editor.apply_if_accepted(tx)? else {
+            return Ok(false);
+        };
         self.refresh_projection(&change.map)?;
-        Ok(())
+        Ok(true)
     }
 
     pub(super) fn block_offsets(&self, range: Range<DocPos>) -> Option<Range<usize>> {

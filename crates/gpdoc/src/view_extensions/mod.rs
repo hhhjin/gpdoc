@@ -12,6 +12,8 @@ pub(crate) use config::ViewConfig;
 pub use config::{DocumentSource, EditorPlugin, OpenError, PluginViewExt};
 pub(crate) use decorations::paint_decorations;
 pub use decorations::{DecorationFrame, PaintLayer};
+pub(crate) use drops::{BlockHover, DropIndicator};
+pub use interactions::BlockDropTarget;
 
 use crate::{
     EditableChild, EditorView, NodeView,

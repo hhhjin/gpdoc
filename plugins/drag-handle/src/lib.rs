@@ -1,14 +1,16 @@
-//! Drag top-level blocks or a selected block range by its gutter handle.
-use gpdoc::{EditorView, ViewPlugin};
-use gpdoc_plugin::core::{DocPos, ReplaceAroundStep, Selection, Step};
+//! Move blocks and sibling ranges using one editor-wide gutter handle.
+mod movement;
+use gpdoc::{AnchoredElement, BlockDropTarget, EditorView, ViewBehavior, ViewFrame, ViewPlugin};
+use gpdoc_plugin::core::{DocPos, Editor, Selection, Transaction};
 use gpui::{
-    AnyElement, App, Context, Entity, IntoElement, MouseButton, Window, div, prelude::*, px,
+    AnyElement, App, Bounds, Context, Entity, IntoElement, MouseButton, MouseMoveEvent, Pixels,
+    Point, Window, div, point, prelude::*, px,
 };
 #[cfg(target_family = "wasm")]
 use gpui_browser as gpui;
-use std::rc::Rc;
+use std::{cell::Cell, rc::Rc};
 
-/// Configure the native drag gesture for top-level blocks.
+/// Configure the native drag gesture for document blocks.
 pub fn drag_handle() -> DragHandle {
     DragHandle
 }
@@ -50,38 +52,137 @@ impl DragHandle {
     ) -> ViewPlugin {
         let render: Renderer =
             Rc::new(move |slot, window, cx| render(slot, window, cx).into_any_element());
-        ViewPlugin::named("dragHandle")
-            .wrap_blocks(move |block, body, window, cx| {
-                let before = block.before;
-                let view = block.view;
-                let composing = view.read(cx).is_composing();
-                let drag = BlockDrag::new(&view, before, render.clone(), cx);
-                let handle = div()
-                    .id(("gpdoc-drag", before.0))
-                    .debug_selector(move || format!("gpdoc-drag-{}", before.0))
-                    .min_w(px(16.))
-                    .min_h(px(24.))
-                    .cursor_move()
-                    .child(drag.render_part(DragHandlePart::Grip, window, cx))
-                    .on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()));
+        ViewPlugin::new("dragHandle", move || GutterHandle {
+            render: render.clone(),
+            active: Cell::new(None),
+        })
+        .wrap_blocks(|_, body, _, _| div().pl(px(GUTTER)).min_h(px(GRIP_HEIGHT)).child(body))
+        .on_block_drop(move_blocks)
+    }
+}
 
-                div()
-                    .flex()
-                    .items_start()
-                    .gap(px(4.))
-                    .child(
-                        div()
-                            .flex_none()
-                            .when(composing, |el| el.invisible())
-                            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                                view.update(cx, |editor, cx| editor.focus_in(window, cx));
-                                cx.stop_propagation();
-                            })
-                            .child(handle),
-                    )
-                    .child(div().flex_1().min_w_0().child(body))
+// Reserve the gutter once at the document edge, independent of nesting depth.
+const GUTTER: f32 = 20.;
+const GRIP_HEIGHT: f32 = 24.;
+
+struct GutterHandle {
+    render: Renderer,
+    active: Cell<Option<ActiveGrip>>,
+}
+
+#[derive(Clone, Copy)]
+struct ActiveGrip {
+    root: DocPos,
+    owner: DocPos,
+    revision: u64,
+    // Includes the space to cross from the block's left edge to the handle.
+    approach: Bounds<Pixels>,
+}
+
+impl GutterHandle {
+    fn target(
+        editor: &Editor,
+        hit: Option<DocPos>,
+        mouse: Point<Pixels>,
+        active: Option<ActiveGrip>,
+    ) -> Option<(DocPos, DocPos)> {
+        let doc = editor.document();
+        let active = active
+            .filter(|grip| grip.revision == editor.revision() && grip.approach.contains(&mouse));
+        // A 24px grip can extend below a short line into the next block's gutter.
+        // Its visible hitbox still belongs to the block that placed it.
+        let hit = match active {
+            Some(grip) if mouse.x < grip.approach.left() + px(GUTTER) => grip.owner,
+            _ => hit?,
+        };
+        let path = doc.resolve(hit).ok()?;
+        let root = DocPos(path.before(1).ok()?);
+        if let Some(grip) = active
+            && (hit.0..hit.0 + doc.node_at(hit)?.size()).contains(&grip.owner.0)
+        {
+            return Some((root, grip.owner));
+        }
+        Some((root, editor.config().drag_handle_owner(&path)?))
+    }
+
+    fn grip(&self, frame: &ViewFrame<'_>, mouse: Point<Pixels>, cx: &App) -> Option<ActiveGrip> {
+        let view = frame.view.read(cx);
+        if view.is_composing() || cx.has_active_drag() || !frame.clip.contains(&mouse) {
+            return None;
+        }
+        let active = self.active.get().and_then(|mut grip| {
+            grip.approach = Self::approach(frame, grip.root, grip.owner)?;
+            Some(grip)
+        });
+        let (root, owner) = Self::target(view.editor(), frame.block_at(mouse), mouse, active)?;
+        Some(ActiveGrip {
+            root,
+            owner,
+            revision: view.editor().revision(),
+            approach: Self::approach(frame, root, owner)?,
+        })
+    }
+
+    fn approach(frame: &ViewFrame<'_>, root: DocPos, owner: DocPos) -> Option<Bounds<Pixels>> {
+        let gutter = frame.block_bounds(root)?.left();
+        let block = frame.block_bounds(owner)?;
+        let top = frame.block_content_top(owner)?;
+        Some(Bounds::from_corners(
+            point(gutter, top),
+            point(block.left().max(gutter + px(GUTTER)), top + px(GRIP_HEIGHT)),
+        ))
+    }
+}
+
+impl ViewBehavior for GutterHandle {
+    fn mouse_move(
+        &self,
+        view: &mut EditorView,
+        event: &MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<EditorView>,
+    ) -> bool {
+        if event.pressed_button.is_none() && !view.is_composing() {
+            let hit = view
+                .child_bounds_at(event.position, window)
+                .map(|(hit, _)| hit);
+            let hovered = Self::target(view.editor(), hit, event.position, self.active.get())
+                .map(|(_, owner)| owner);
+            if hovered != self.active.get().map(|grip| grip.owner) {
+                cx.notify();
+            }
+        }
+        false
+    }
+
+    fn render(
+        self: Rc<Self>,
+        frame: &ViewFrame<'_>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<AnchoredElement> {
+        let grip = self.grip(frame, window.mouse_position(), cx);
+        self.active.set(grip);
+        let grip = grip?;
+        let view = frame.view.clone();
+        let drag = BlockDrag::new(&view, grip.owner, self.render.clone(), cx);
+        let handle = div()
+            .id(("gpdoc-drag-handle", view.entity_id()))
+            .debug_selector(|| "gpdoc-drag-handle".into())
+            .w(px(GUTTER))
+            .h(px(GRIP_HEIGHT))
+            .cursor_move()
+            .child(drag.render_part(DragHandlePart::Grip, window, cx))
+            .on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()));
+        let handle = div()
+            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                view.update(cx, |editor, cx| editor.focus_in(window, cx));
+                cx.stop_propagation();
             })
-            .on_block_drop(move_blocks)
+            .child(handle);
+        Some(AnchoredElement::new(handle, move |_, _| {
+            grip.approach.origin
+        }))
     }
 }
 
@@ -135,50 +236,13 @@ impl Render for BlockDrag {
 }
 
 fn move_blocks(
-    view: &mut EditorView,
+    view: &EditorView,
     drag: &BlockDrag,
-    target: DocPos,
-    window: &mut Window,
-    cx: &mut Context<EditorView>,
-) -> bool {
+    targets: &[BlockDropTarget],
+    cx: &Context<EditorView>,
+) -> Option<(BlockDropTarget, Transaction)> {
     if drag.editor.entity_id() != cx.entity_id() || view.editor().revision() != drag.revision {
-        return false;
+        return None;
     }
-    let doc = view.editor().document();
-    let range = drag.selection.bounds(doc);
-    if (range.start..=range.end).contains(&target) {
-        return false;
-    }
-    let width = range.end.0 - range.start.0;
-    let Ok(slice) = doc.root().slice(range.start.0, range.end.0, false) else {
-        return false;
-    };
-    // Carry the intervening siblings through the gap, preserving their mapped positions.
-    let (gap_from, gap_to, insert, new_at) = if target > range.end {
-        (range.end, target, 0, DocPos(target.0 - width))
-    } else {
-        (target, range.start, width, target)
-    };
-    let mut tx = view.editor().transaction();
-    tx.push(Step::ReplaceAround(ReplaceAroundStep {
-        from: range.start.min(target).0,
-        to: range.end.max(target).0,
-        gap_from: gap_from.0,
-        gap_to: gap_to.0,
-        insert,
-        slice,
-        structure: false,
-    }));
-    tx.select(match drag.selection {
-        Selection::NodeRange { anchor, head } if anchor > head => Selection::NodeRange {
-            anchor: DocPos(new_at.0 + width),
-            head: new_at,
-        },
-        Selection::NodeRange { .. } => Selection::NodeRange {
-            anchor: new_at,
-            head: DocPos(new_at.0 + width),
-        },
-        _ => Selection::Node { before: new_at },
-    });
-    view.apply_node_view(tx, window, cx).is_ok()
+    movement::plan(view.editor(), drag.selection, targets)
 }

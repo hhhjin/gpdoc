@@ -183,11 +183,19 @@ impl TextLayout {
     }
 
     pub(crate) fn child_bounds(&self, before: DocPos) -> Option<Bounds<Pixels>> {
+        Some(self.child(before)?.bounds)
+    }
+
+    pub(crate) fn child_content_top(&self, before: DocPos) -> Option<Pixels> {
+        Some(self.child(before)?.content_top)
+    }
+
+    fn child(&self, before: DocPos) -> Option<&ChildBounds> {
         let index = self
             .children
             .binary_search_by_key(&before, |child| child.slot.before)
             .ok()?;
-        Some(self.children[index].bounds)
+        self.children.get(index)
     }
 
     /// Shape native input at each slot's last GPUI allocation. GPUI places the

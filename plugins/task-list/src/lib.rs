@@ -37,6 +37,7 @@ pub fn task_item_with_nesting(nested: bool) -> Plugin {
                     AttrSpec::with_default(AttrType::Bool, Value::Bool(false)),
                 )])),
         );
+        p.drag_handle("taskItem", ["paragraph"]);
         p.command::<Split>(|ctx, _| split_item(ctx, "taskItem"));
         p.on_break("taskItem", |ctx| ctx.plan(Split));
         p.command::<Lift>(|ctx, _| lift_item(ctx, "taskItem"));

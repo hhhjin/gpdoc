@@ -436,9 +436,16 @@ impl Editor {
     }
 
     pub fn apply(&mut self, tx: Transaction) -> Result<AppliedChange, Error> {
+        Ok(self
+            .apply_if_accepted(tx)?
+            .unwrap_or_else(|| self.unchanged()))
+    }
+
+    /// Apply a transaction, returning None if an editor filter rejects it.
+    pub fn apply_if_accepted(&mut self, tx: Transaction) -> Result<Option<AppliedChange>, Error> {
         let mut draft = Draft::new(&self.state);
         self.command_context().apply_to(&mut draft, tx)?;
-        self.commit(draft)
+        self.commit_if_accepted(draft, None)
     }
 
     /// Insert committed text and apply the first matching input rule as one edit.
@@ -471,9 +478,27 @@ impl Editor {
 
     fn commit_with_paste(
         &mut self,
-        mut draft: Draft,
+        draft: Draft,
         pasted: Option<&std::ops::Range<DocPos>>,
     ) -> Result<AppliedChange, Error> {
+        Ok(self
+            .commit_if_accepted(draft, pasted)?
+            .unwrap_or_else(|| self.unchanged()))
+    }
+
+    fn unchanged(&self) -> AppliedChange {
+        AppliedChange {
+            revision: self.revision,
+            selection: self.selection(),
+            map: PositionMap::default(),
+        }
+    }
+
+    fn commit_if_accepted(
+        &mut self,
+        mut draft: Draft,
+        pasted: Option<&std::ops::Range<DocPos>>,
+    ) -> Result<Option<AppliedChange>, Error> {
         let before = Some(&self.state.doc);
         draft.append(&self.config, before, pasted)?;
         if !self.config.accepts(crate::DocumentChange {
@@ -483,11 +508,7 @@ impl Editor {
             document: &draft.state.doc,
             schema: self.schema(),
         })? {
-            return Ok(AppliedChange {
-                revision: self.revision,
-                selection: self.selection(),
-                map: PositionMap::default(),
-            });
+            return Ok(None);
         }
         // Moving a selection or applying an already-active mark preserves the redo branch.
         if draft.map.is_identity() && draft.state.doc == self.state.doc {
@@ -497,11 +518,11 @@ impl Editor {
                 self.revision = self.next_revision()?;
             }
             self.state = draft.state;
-            return Ok(AppliedChange {
+            return Ok(Some(AppliedChange {
                 revision: self.revision,
                 selection: self.selection(),
                 map: draft.map,
-            });
+            }));
         }
         let revision = self.next_revision()?;
         let after = draft.state.clone();
@@ -514,11 +535,11 @@ impl Editor {
         });
         self.redo.clear();
         self.revision = revision;
-        Ok(AppliedChange {
+        Ok(Some(AppliedChange {
             revision,
             selection: self.selection(),
             map: draft.map,
-        })
+        }))
     }
 
     pub fn undo(&mut self) -> Result<AppliedChange, Error> {

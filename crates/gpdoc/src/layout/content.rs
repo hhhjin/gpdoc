@@ -27,7 +27,8 @@ impl Part {
     fn document(buffer: &InputBuffer, views: &BlockViews) -> Vec<Self> {
         let doc = buffer.state().0;
         let mut wrappers = Vec::new();
-        if !views.top_level_wrappers.is_empty()
+        if views.measure_all
+            || !views.top_level_wrappers.is_empty()
             || !views.wrappers.is_empty()
             || !views.layouts.is_empty()
         {
@@ -44,7 +45,8 @@ impl Part {
                 }
                 let named = views.wrappers.get(&node.kind);
                 let layout = views.layouts.get(&node.kind);
-                if before.0 >= layout_end
+                if !views.measure_all
+                    && before.0 >= layout_end
                     && layout.is_none()
                     && named.is_none()
                     && (!top || views.top_level_wrappers.is_empty())
@@ -139,15 +141,35 @@ pub(in super::super) struct Slot {
 pub(in super::super) struct ChildBounds {
     slot: Slot,
     bounds: Bounds<Pixels>,
+    content_top: Pixels,
     clip: Bounds<Pixels>,
     prepaint_order: usize,
 }
 
 #[derive(Default)]
 struct Frame {
-    measured: Vec<Rc<TextSection>>,
+    content: Vec<MeasuredContent>,
     children: Vec<ChildBounds>,
     document: Option<TextLayout>,
+}
+
+// In prepaint order. A child layout contributes its own visible edge before
+// its descendants, while ordinary containers lead with their first text line.
+enum MeasuredContent {
+    Text(Rc<TextSection>),
+    Layout(Pixels),
+}
+
+impl MeasuredContent {
+    fn top(&self, node: &Node) -> Pixels {
+        match self {
+            Self::Text(section) if node.is_leaf() => {
+                section.image_top().unwrap_or(section.bounds.top())
+            }
+            Self::Text(section) => section.bounds.top(),
+            Self::Layout(top) => *top,
+        }
+    }
 }
 
 struct TextFragment {
@@ -232,7 +254,10 @@ impl Element for TextFragment {
         _: &mut App,
     ) -> Self::PrepaintState {
         let section = Rc::new(measure.borrow_mut().layout(bounds, window));
-        self.frame.borrow_mut().measured.push(section.clone());
+        self.frame
+            .borrow_mut()
+            .content
+            .push(MeasuredContent::Text(section.clone()));
         section
     }
 
@@ -393,12 +418,12 @@ impl EditableChild {
     ) -> AnyElement {
         let (wrap, layout, parts) = self.into_parts();
         let body = match layout {
-            Some(render) => render(
+            Some(render) => wrap.layout_body(render(
                 wrap.node_view(cx),
                 Self::children(&wrap.builder, parts),
                 window,
                 cx,
-            ),
+            )),
             None => wrap.builder.children(parts, window, cx),
         };
         let body = wrap.apply_wrappers(body, window, cx);
@@ -429,8 +454,18 @@ impl ChildWrapper {
 
     /// Apply the block's wrappers to a body assembled from its editable children.
     pub fn wrap(self, content: AnyElement, window: &mut Window, cx: &mut App) -> AnyElement {
+        let content = self.layout_body(content);
         let body = self.apply_wrappers(content, window, cx);
         self.track(body)
+    }
+
+    fn layout_body(&self, element: AnyElement) -> AnyElement {
+        MeasuredChild {
+            frame: self.builder.frame.clone(),
+            measurement: Measurement::LayoutBody,
+            element,
+        }
+        .into_any_element()
     }
 
     fn apply_wrappers(
@@ -448,7 +483,7 @@ impl ChildWrapper {
     fn track(self, element: AnyElement) -> AnyElement {
         MeasuredChild {
             frame: self.builder.frame.clone(),
-            slot: self.slot,
+            measurement: Measurement::Block(self.slot),
             element,
         }
         .into_any_element()
@@ -459,8 +494,13 @@ impl ChildWrapper {
 // in its parent's layout. Recording bounds adds no layout node or paint layer.
 struct MeasuredChild {
     frame: Rc<RefCell<Frame>>,
-    slot: Slot,
+    measurement: Measurement,
     element: AnyElement,
+}
+
+enum Measurement {
+    Block(Slot),
+    LayoutBody,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -476,7 +516,10 @@ impl Element for MeasuredChild {
     type PrepaintState = ();
 
     fn id(&self) -> Option<ElementId> {
-        Some(("gpdoc-editable-child", self.slot.before.0).into())
+        match &self.measurement {
+            Measurement::Block(slot) => Some(("gpdoc-editable-child", slot.before.0).into()),
+            Measurement::LayoutBody => None,
+        }
     }
     fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
         None
@@ -500,17 +543,31 @@ impl Element for MeasuredChild {
         window: &mut Window,
         cx: &mut App,
     ) {
-        {
+        let Measurement::Block(slot) = &self.measurement else {
+            self.frame
+                .borrow_mut()
+                .content
+                .push(MeasuredContent::Layout(bounds.top()));
+            self.element.prepaint(window, cx);
+            return;
+        };
+        let (child_index, first_content) = {
             let mut frame = self.frame.borrow_mut();
             let prepaint_order = frame.children.len();
             frame.children.push(ChildBounds {
-                slot: self.slot.clone(),
+                slot: slot.clone(),
                 bounds,
+                content_top: bounds.top(),
                 clip: window.content_mask().bounds,
                 prepaint_order,
             });
-        }
+            (prepaint_order, frame.content.len())
+        };
         self.element.prepaint(window, cx);
+        let mut frame = self.frame.borrow_mut();
+        if let Some(first) = frame.content.get(first_content) {
+            frame.children[child_index].content_top = first.top(&slot.node);
+        }
     }
     fn paint(
         &mut self,
@@ -584,7 +641,13 @@ impl Element for TextElement {
         // An editor embedded in a cached host must invalidate that host when it changes.
         window.set_view_id(self.view.entity_id());
         surface.root.prepaint(window, cx);
-        let mut sections = std::mem::take(&mut surface.frame.borrow_mut().measured);
+        let mut sections: Vec<_> = std::mem::take(&mut surface.frame.borrow_mut().content)
+            .into_iter()
+            .filter_map(|content| match content {
+                MeasuredContent::Text(section) => Some(section),
+                MeasuredContent::Layout(_) => None,
+            })
+            .collect();
         sections.sort_by_key(|s| s.rows[0].start);
         let mut children = std::mem::take(&mut surface.frame.borrow_mut().children);
         children.sort_unstable_by_key(|child| child.slot.before);
@@ -593,6 +656,9 @@ impl Element for TextElement {
             sections,
             children,
         };
+        self.view.update(cx, |view, cx| {
+            view.refresh_drop_indicator(&layout, window, cx)
+        });
         let mut controls =
             super::super::node_view::prepaint_controls(&self.view, &layout, window, cx);
         controls.extend(crate::view_extensions::prepaint_elements(

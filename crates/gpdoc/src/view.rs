@@ -132,7 +132,8 @@ pub struct EditorView {
     pub(super) layout: Option<TextLayout>,
     pub(crate) block_views: std::rc::Rc<super::node_view::BlockViews>,
     pub(crate) node_views: std::collections::BTreeMap<String, super::node_view::Renderer>,
-    pub(crate) inline_drop_target: bool,
+    pub(crate) block_drag: Option<gpui::WeakEntity<Option<crate::view_extensions::BlockHover>>>,
+    pub(crate) drop_indicator_kind: crate::view_extensions::DropIndicator,
     pub(crate) behaviors: Vec<std::rc::Rc<dyn super::ViewBehavior>>,
     pub(crate) extensions: crate::view_extensions::ViewExtensions,
     media_base_url: Option<url::Url>,
@@ -168,7 +169,8 @@ impl EditorView {
             block_views: views.block_views.clone(),
             extensions: views.extensions.clone(),
             behaviors,
-            inline_drop_target: false,
+            block_drag: None,
+            drop_indicator_kind: crate::view_extensions::DropIndicator::Block(None),
             media_base_url: None,
             geometry_dirty: false,
             dragging: false,
@@ -248,9 +250,20 @@ impl EditorView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<(), Error> {
-        self.buffer.apply_node_view(tx)?;
-        self.edited(Ok(()), window, cx);
-        Ok(())
+        self.apply_node_view_if_accepted(tx, window, cx).map(|_| ())
+    }
+
+    pub(crate) fn apply_node_view_if_accepted(
+        &mut self,
+        tx: gpdoc_core::Transaction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<bool, Error> {
+        let accepted = self.buffer.apply_node_view(tx)?;
+        if accepted {
+            self.edited(Ok(()), window, cx);
+        }
+        Ok(accepted)
     }
 
     fn plugin_key(&mut self, stroke: &Keystroke, window: &mut Window, cx: &mut Context<Self>) {

@@ -16,6 +16,7 @@ pub fn blockquote() -> Plugin {
                 .group("block")
                 .content("block+"),
         );
+        p.drag_handle("blockquote", ["paragraph"]);
         p.input_rule(wrap_input);
         p.command::<Set>(|editor, _| {
             let blocks = selected_blocks(editor);

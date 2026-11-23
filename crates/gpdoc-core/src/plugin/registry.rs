@@ -57,6 +57,10 @@ impl Registry {
                 self.reserve("mark", &spec.name)?;
                 self.marks.push(spec);
             }
+            Declaration::DragHandle(owner, scope) => {
+                self.reserve("drag handle", &owner)?;
+                self.hooks.drag_handles.insert(owner, scope);
+            }
             Declaration::AtomLabel(kind, label) => {
                 self.reserve("atom label", &kind)?;
                 self.hooks.atom_labels.insert(kind, label);

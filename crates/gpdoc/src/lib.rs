@@ -36,7 +36,7 @@ pub use {
     session::{EditSession, SessionUpdate},
     view::{EditorSurface, EditorView, primary_pressed},
     view_extensions::{
-        AnchoredElement, DecorationFrame, DocumentSource, EditorPlugin, OpenError, PaintLayer,
-        PluginViewExt, ViewBehavior, ViewFrame, ViewPlugin,
+        AnchoredElement, BlockDropTarget, DecorationFrame, DocumentSource, EditorPlugin, OpenError,
+        PaintLayer, PluginViewExt, ViewBehavior, ViewFrame, ViewPlugin,
     },
 };

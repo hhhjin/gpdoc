@@ -222,6 +222,7 @@ impl EditorConfigBuilder {
                 }
             }
             extensions.behaviors.extend(view.behavior);
+            block_views.measure_all |= view.drops.iter().any(drops::Registration::targets_blocks);
             drops.extend(view.drops);
         }
         extensions.surface_handlers = drops::compile(drops);

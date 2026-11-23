@@ -1,9 +1,10 @@
-use super::open_editor;
+use super::{hover_block, open_editor};
 use gpdoc::{
     DecorationFrame, DocumentSource, EditorConfig, PaintLayer, PluginViewExt, ViewBehavior,
     ViewPlugin,
 };
-use gpdoc_core::{Attrs, DocPos, Node, Selection, Value};
+use gpdoc_core::{Attrs, DocPos, Node, ReplaceStep, Selection, Step, Value};
+use gpdoc_plugin::Plugin;
 use gpdoc_plugin_box_selection::{box_selection, selection_box};
 use gpdoc_plugin_bubble_menu::bubble_menu;
 use gpdoc_plugin_drag_handle::drag_handle;
@@ -171,9 +172,11 @@ fn decorations_menus_and_drop_handlers() {
                 true
             }
         }))
-        .plugin(ViewPlugin::named("lastDrop").on_block_drop(
-            |_, _: &gpui::ExternalPaths, _, _, _| panic!("a handled drop reached a later plugin"),
-        ))
+        .plugin(
+            ViewPlugin::named("lastDrop").on_block_drop(|_, _: &gpui::ExternalPaths, _, _| {
+                panic!("a handled drop reached a later plugin");
+            }),
+        )
         .build()
         .unwrap();
     let mut app = TestAppContext::single();
@@ -241,8 +244,9 @@ fn decorations_menus_and_drop_handlers() {
     cx.simulate_keystrokes("secondary-v");
     assert_eq!(files.get(), 1);
     cx.simulate_keystrokes("left");
+    hover_block(cx, &entity, 0, false);
     let first = cx
-        .debug_bounds("gpdoc-drag-0")
+        .debug_bounds("gpdoc-drag-handle")
         .expect("first paragraph handle")
         .center();
     let last = cx.update(|window, cx| {
@@ -708,8 +712,9 @@ fn dragging_a_leaf_handle_moves_the_selected_block_range() {
         });
     });
     cx.run_until_parked();
+    hover_block(cx, &entity, 0, false);
     let handle = cx
-        .debug_bounds("gpdoc-drag-0")
+        .debug_bounds("gpdoc-drag-handle")
         .expect("leaf drag handle")
         .center();
     let end = cx.update(|window, cx| {
@@ -751,6 +756,597 @@ fn dragging_a_leaf_handle_moves_the_selected_block_range() {
     });
     cx.simulate_keystrokes("secondary-z");
     cx.update(|_, cx| assert_eq!(entity.read(cx).editor().document().blocks(), original));
+}
+
+fn drag_to_block(
+    cx: &mut gpui::VisualTestContext,
+    editor: &gpui::Entity<gpdoc::EditorView>,
+    source: usize,
+    over: usize,
+    after: bool,
+) {
+    let top = cx.update(|_, cx| {
+        editor
+            .read(cx)
+            .editor()
+            .document()
+            .resolve(DocPos(source))
+            .unwrap()
+            .depth()
+            == 0
+    });
+    hover_block(cx, editor, source, top);
+    let start = cx
+        .debug_bounds("gpdoc-drag-handle")
+        .expect("source grip")
+        .center();
+    cx.simulate_mouse_move(start, None, Default::default());
+    let end = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            let bounds = view
+                .child_bounds(DocPos(over), window)
+                .expect("target block");
+            point(
+                bounds.right() - px(4.),
+                if after {
+                    bounds.bottom() - px(1.)
+                } else {
+                    bounds.top() + px(1.)
+                },
+            )
+        })
+    });
+    cx.simulate_mouse_down(start, MouseButton::Left, Default::default());
+    cx.simulate_mouse_move(
+        point(start.x + px(8.), start.y),
+        MouseButton::Left,
+        Default::default(),
+    );
+    cx.simulate_mouse_move(end, MouseButton::Left, Default::default());
+    cx.simulate_mouse_up(end, MouseButton::Left, Default::default());
+}
+
+#[test]
+fn named_root_blocks_can_be_reordered_without_a_block_group() {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin::Plugin::new("sections", |p| {
+            p.node(gpdoc_core::NodeSpec::block("section").content("text*"));
+            p.document_content("section+");
+        }))
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let [a, b] = ["A", "B"].map(|text| Node::text("section", text));
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![a.clone(), b.clone()]),
+    );
+    drag_to_block(cx, &editor, 0, a.size(), true);
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().document().blocks(), [b, a]));
+}
+
+#[test]
+fn heading_can_leave_a_quote_via_the_adjacent_paragraph_edge() {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_heading::heading())
+        .plugin(gpdoc_plugin_blockquote::blockquote())
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let heading = Node::text("heading", "Title");
+    let body = Node::text("paragraph", "Body");
+    let body_before = 1 + heading.size();
+    let quote = Node::container("blockquote", vec![heading, body.clone()]);
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(&mut app, &config, DocumentSource::Blocks(vec![quote]));
+    let revision = cx.update(|_, cx| editor.read(cx).editor().revision());
+    drag_to_block(cx, &editor, 1, 1, true);
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().revision(), revision));
+
+    drag_to_block(cx, &editor, 1, body_before, false);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        let [quote, heading] = state.document().blocks() else {
+            panic!("expected the heading after the quote")
+        };
+        assert_eq!(quote.child(0), &body);
+        assert_eq!(heading.kind, "heading");
+        assert_eq!(
+            state.selection(),
+            Selection::Node {
+                before: DocPos(quote.size())
+            }
+        );
+    });
+}
+
+#[test]
+fn quote_body_owns_the_drag_and_accepts_an_incoming_paragraph() {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_blockquote::blockquote())
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let a = Node::text("paragraph", "A");
+    let b = Node::text("paragraph", "B");
+    let c = Node::text("paragraph", "C");
+    let quote = |children| Node::container("blockquote", children);
+    let original = vec![a.clone(), quote(vec![b.clone()]), c.clone()];
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(&mut app, &config, DocumentSource::Blocks(original.clone()));
+
+    let revision = cx.update(|_, cx| editor.read(cx).editor().revision());
+    drag_to_block(cx, &editor, 3, 4, true);
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().revision(), revision));
+
+    // Drop A inside the quote, then use that same paragraph to move the whole quote.
+    drag_to_block(cx, &editor, 0, 4, true);
+    let nested = vec![quote(vec![b.clone(), a.clone()]), c.clone()];
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        assert_eq!(state.document().blocks(), nested);
+        assert_eq!(state.selection(), Selection::Node { before: DocPos(4) });
+    });
+    drag_to_block(cx, &editor, 4, 8, true);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        assert_eq!(state.document().blocks(), [c, quote(vec![b, a])]);
+        assert_eq!(state.selection(), Selection::Node { before: DocPos(3) });
+    });
+    cx.simulate_keystrokes("secondary-z");
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().document().blocks(), nested));
+    cx.simulate_keystrokes("secondary-z");
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().document().blocks(), original));
+}
+
+#[test]
+fn one_gutter_handle_follows_the_hovered_quote_row() {
+    let painted = Rc::new(RefCell::new(Vec::new()));
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_blockquote::blockquote())
+        .plugin(drag_handle().with_view({
+            let painted = painted.clone();
+            move |slot, _, _| {
+                use gpui::Styled;
+                let painted = painted.clone();
+                gpui::canvas(
+                    |_, _, _| (),
+                    move |_, _, _, _| {
+                        if slot.part == gpdoc_plugin_drag_handle::DragHandlePart::Grip {
+                            painted.borrow_mut().push(slot.before.0);
+                        }
+                    },
+                )
+                .size(px(12.))
+            }
+        }))
+        .build()
+        .unwrap();
+    let grips_in_frame = |cx: &mut gpui::VisualTestContext| {
+        painted.borrow_mut().clear();
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        painted.take()
+    };
+    let [a, b, c] = ["A", "B", "C"].map(|s| Node::text("paragraph", s));
+    let multi = Node::container("blockquote", vec![a, b]);
+    let single = Node::container("blockquote", vec![c]);
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![multi.clone(), single.clone()]),
+    );
+
+    for paragraph in [1, 4] {
+        hover_block(cx, &editor, paragraph, false);
+        assert_eq!(grips_in_frame(cx), [0]);
+    }
+    let grip = cx.debug_bounds("gpdoc-drag-handle").unwrap().center();
+    cx.simulate_mouse_move(grip, None, Default::default());
+    assert_eq!(grips_in_frame(cx), [0]);
+    hover_block(cx, &editor, 9, false);
+    assert_eq!(grips_in_frame(cx), [8]);
+    // Approach the destination through its gutter to drop before the entire quote.
+    let start = cx.debug_bounds("gpdoc-drag-handle").unwrap().center();
+    let end = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            let bounds = view.child_bounds(DocPos(0), window).unwrap();
+            point(bounds.left() + px(1.), bounds.top() + px(1.))
+        })
+    });
+    cx.simulate_mouse_move(start, None, Default::default());
+    cx.simulate_mouse_down(start, MouseButton::Left, Default::default());
+    cx.simulate_mouse_move(
+        point(start.x + px(8.), start.y),
+        MouseButton::Left,
+        Default::default(),
+    );
+    cx.simulate_mouse_move(end, MouseButton::Left, Default::default());
+    cx.simulate_mouse_up(end, MouseButton::Left, Default::default());
+    cx.update(|_, cx| {
+        assert_eq!(
+            editor.read(cx).editor().document().blocks(),
+            [single, multi]
+        )
+    });
+    cx.simulate_mouse_move(point(end.x, end.y + px(300.)), None, Default::default());
+    assert!(grips_in_frame(cx).is_empty());
+}
+
+#[test]
+fn heading_grip_starts_at_the_first_line_after_all_wrappers() {
+    use gpui::prelude::*;
+
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_heading::heading())
+        .plugin(
+            ViewPlugin::named("heading typography").wrap_node("heading", |_, body, _, _| {
+                div()
+                    .pt(px(7.))
+                    .text_size(px(40.))
+                    .line_height(px(50.))
+                    .child(body)
+            }),
+        )
+        .plugin(
+            ViewPlugin::named("block spacing")
+                .wrap_blocks(|_, body, _, _| div().pt(px(22.)).child(body)),
+        )
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![
+            Node::text("heading", "Title"),
+            Node::text("paragraph", "After"),
+        ]),
+    );
+    let original = cx.update(|_, cx| editor.read(cx).editor().document().clone());
+    let (outer, line) = cx.update(|window, cx| {
+        editor.update(cx, |view, cx| {
+            (
+                view.child_bounds(DocPos(0), window).unwrap(),
+                view.bounds_for_range(0..1, Bounds::default(), window, cx)
+                    .unwrap(),
+            )
+        })
+    });
+    assert_eq!(line.top() - outer.top(), px(29.));
+    cx.simulate_mouse_move(line.center(), None, Default::default());
+    let grip = cx.debug_bounds("gpdoc-drag-handle").unwrap();
+    assert_eq!(grip.top(), line.top());
+    cx.simulate_mouse_move(grip.center(), None, Default::default());
+    assert_eq!(cx.debug_bounds("gpdoc-drag-handle"), Some(grip));
+    drag_to_block(cx, &editor, 0, original.blocks()[0].size(), true);
+    cx.update(|_, cx| {
+        assert_eq!(
+            editor.read(cx).editor().document().blocks()[1],
+            original.blocks()[0]
+        )
+    });
+}
+
+#[test]
+fn small_block_images_anchor_at_their_painted_top_inside_a_tall_line() {
+    use gpui::{
+        http_client::{FakeHttpClient, Response},
+        prelude::*,
+    };
+
+    let mut app = TestAppContext::single();
+    app.update(|cx| cx.set_http_client(FakeHttpClient::create(|_| async {
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#;
+        Ok(Response::new(svg.into()))
+    })));
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_image::image())
+        .plugin(
+            ViewPlugin::named("tall lines")
+                .wrap_blocks(|_, body, _, _| div().pt(px(10.)).line_height(px(60.)).child(body)),
+        )
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let images = [4, 9].map(|height| {
+        Node::leaf(
+            "image",
+            Attrs::from([
+                ("src".into(), "https://example.test/square.svg".into()),
+                ("height".into(), Value::from(height)),
+            ]),
+        )
+    });
+    let (editor, cx) = open_editor(&mut app, &config, DocumentSource::Blocks(images.into()));
+    let offsets = [0, 1].map(|before| {
+        hover_block(cx, &editor, before, false);
+        let grip = cx.debug_bounds("gpdoc-drag-handle").unwrap();
+        let outer = cx.update(|window, cx| {
+            editor.update(cx, |view, _| {
+                view.child_bounds(DocPos(before), window).unwrap()
+            })
+        });
+        grip.top() - outer.top()
+    });
+    assert!(offsets[1] > px(10.));
+    assert_eq!(offsets[0] - offsets[1], px(5.));
+}
+
+#[test]
+fn a_short_nested_line_keeps_its_handle_when_the_pointer_enters_the_grip() {
+    use gpui::prelude::*;
+
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_blockquote::blockquote())
+        .plugin(
+            ViewPlugin::named("compact lines").wrap_node("paragraph", |_, body, _, _| {
+                div()
+                    .pt(px(24.))
+                    .text_size(px(8.))
+                    .line_height(px(8.))
+                    .child(body)
+            }),
+        )
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![
+            Node::container("blockquote", vec![Node::text("paragraph", "A")]),
+            Node::text("paragraph", "B"),
+        ]),
+    );
+    let line = cx.update(|window, cx| {
+        editor.update(cx, |view, cx| {
+            view.bounds_for_range(0..1, Bounds::default(), window, cx)
+                .unwrap()
+        })
+    });
+    cx.simulate_mouse_move(line.center(), None, Default::default());
+    let grip = cx.debug_bounds("gpdoc-drag-handle").unwrap();
+    assert_eq!(grip.top(), line.top());
+    cx.simulate_mouse_move(
+        point(grip.center().x, grip.bottom() - px(1.)),
+        None,
+        Default::default(),
+    );
+    assert_eq!(cx.debug_bounds("gpdoc-drag-handle"), Some(grip));
+}
+
+#[test]
+fn gutter_handle_follows_the_block_scrolled_under_the_pointer() {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![Node::text("paragraph", "A"); 180]),
+    );
+    hover_block(cx, &editor, 15, true);
+    let grip = cx.debug_bounds("gpdoc-drag-handle").unwrap();
+    let position = grip.center();
+    cx.simulate_mouse_move(position, None, Default::default());
+
+    cx.simulate_event(gpui::ScrollWheelEvent {
+        position,
+        delta: gpui::ScrollDelta::Pixels(point(px(0.), -grip.size.height * 2.)),
+        ..Default::default()
+    });
+    let (before, bounds) = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            view.child_bounds_at(position, window).unwrap()
+        })
+    });
+    assert_ne!(before, DocPos(15));
+    assert_eq!(
+        cx.debug_bounds("gpdoc-drag-handle").unwrap().top(),
+        bounds.top()
+    );
+}
+
+#[test]
+fn hovering_any_table_cell_keeps_the_grip_at_the_table_origin_and_moves_the_whole_table() {
+    use gpui::prelude::*;
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_blockquote::blockquote())
+        .plugin(gpdoc_plugin_table::table().with_view(|| {
+            gpdoc_plugin_table::table_grid(
+                gpdoc_plugin_table::default_cell,
+                gpdoc_plugin_table::default_resize_guide,
+            )
+        }))
+        .plugin(
+            ViewPlugin::named("outer spacing")
+                .wrap_blocks(|_, body, _, _| div().pt(px(17.)).child(body)),
+        )
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let p = |s| Node::text("paragraph", s);
+    let row = |cells| Node::container("tableRow", cells);
+    let table = Node::container(
+        "table",
+        vec![
+            row(vec![
+                Node::container("tableHeader", vec![p("H1")]),
+                Node::container("tableHeader", vec![p("H2")]),
+            ]),
+            row(vec![
+                Node::container("tableCell", vec![p("A"), p("B")]),
+                Node::container(
+                    "tableCell",
+                    vec![Node::container("blockquote", vec![p("C")])],
+                ),
+            ]),
+        ],
+    );
+    let tail = p("After");
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![table, tail.clone()]),
+    );
+    let original = cx.update(|_, cx| editor.read(cx).editor().document().clone());
+    let table = &original.blocks()[0];
+    let table_origin = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            let outer = view.child_bounds(DocPos(0), window).unwrap();
+            let cell = view.child_bounds(DocPos(2), window).unwrap();
+            assert_eq!(cell.top() - outer.top(), px(17.));
+            assert!(view.child_bounds(DocPos(3), window).unwrap().top() > cell.top());
+            point(outer.left(), cell.top())
+        })
+    });
+    let paragraphs: Vec<_> = original
+        .iter_blocks()
+        .filter(|(pos, node)| pos.0 < table.size() && node.kind == "paragraph")
+        .map(|(pos, _)| pos.0)
+        .collect();
+    assert_eq!(paragraphs.len(), 5);
+    for &paragraph in &paragraphs {
+        hover_block(cx, &editor, paragraph, false);
+        assert_eq!(
+            cx.debug_bounds("gpdoc-drag-handle").unwrap().origin,
+            table_origin
+        );
+    }
+    drag_to_block(cx, &editor, *paragraphs.last().unwrap(), table.size(), true);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        assert_eq!(
+            state.selection(),
+            Selection::Node {
+                before: DocPos(tail.size())
+            }
+        );
+        assert_eq!(state.document().blocks(), [tail, table.clone()]);
+    });
+    cx.simulate_keystrokes("secondary-z");
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().document(), &original));
+}
+
+#[test]
+fn a_selected_paragraph_range_can_drop_into_a_table_cell() {
+    let marker = Rc::new(Cell::new(None));
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_table::table())
+        .plugin(drag_handle())
+        .plugin(drop_cursor().with_view({
+            let marker = marker.clone();
+            move |bounds, _, _| marker.set(Some(bounds))
+        }))
+        .build()
+        .unwrap();
+    let [x, a, b] = ["X", "A", "B"].map(|text| Node::text("paragraph", text));
+    let row = Node::container(
+        "tableRow",
+        vec![Node::container("tableCell", vec![x.clone()])],
+    );
+    let table = Node::container("table", vec![row]);
+    let start = table.size();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![table, a.clone(), b.clone()]),
+    );
+    let original = cx.update(|_, cx| editor.read(cx).editor().document().clone());
+    let selection = Selection::NodeRange {
+        anchor: DocPos(start + a.size() + b.size()),
+        head: DocPos(start),
+    };
+    let target_bounds = cx.update(|window, cx| {
+        editor.update(cx, |view, cx| {
+            view.select_document(selection, window, cx).unwrap();
+            view.child_bounds(DocPos(3), window).unwrap()
+        })
+    });
+    cx.run_until_parked();
+    drag_to_block(cx, &editor, start + a.size(), 3, false);
+    let line = marker.get().expect("nested insertion line");
+    assert_eq!(line.origin, target_bounds.origin);
+    assert_eq!(line.size.width, target_bounds.size.width);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        let row = state.document().blocks()[0].child(0);
+        assert_eq!(row.child(0).content.children(), [a, b, x]);
+        assert_eq!(state.document().blocks().len(), 1);
+        assert_eq!(
+            state.selection(),
+            Selection::NodeRange {
+                anchor: DocPos(9),
+                head: DocPos(3)
+            }
+        );
+    });
+    cx.simulate_keystrokes("secondary-z");
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        assert_eq!(state.document(), &original);
+        assert_eq!(state.selection(), selection);
+    });
+}
+
+#[test]
+fn dragging_the_last_task_to_another_list_preserves_the_item_and_removes_the_empty_list() {
+    use gpdoc_plugin_task_list::{task_item, task_list};
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(task_item())
+        .plugin(task_list())
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let item = |labels: &[&str], checked| {
+        Node::new(
+            "taskItem",
+            Attrs::from([("checked".into(), Value::Bool(checked))]),
+            gpdoc_core::Content::Blocks(
+                labels.iter().map(|s| Node::text("paragraph", *s)).collect(),
+            ),
+        )
+    };
+    let list = |items| Node::container("taskList", items);
+    let (a, b) = (item(&["A", "C"], true), item(&["B"], false));
+    let tail = Node::text("paragraph", "After the lists");
+    let original = vec![list(vec![a.clone()]), list(vec![b.clone()]), tail.clone()];
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(&mut app, &config, DocumentSource::Blocks(original.clone()));
+    let revision = cx.update(|_, cx| editor.read(cx).editor().revision());
+    drag_to_block(cx, &editor, 5, 17, true);
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().revision(), revision));
+
+    // Over B's paragraph, the list item boundary is the first compatible destination.
+    drag_to_block(cx, &editor, 5, 12, true);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        assert_eq!(state.document().blocks(), [list(vec![b, a]), tail]);
+        assert_eq!(state.selection(), Selection::Node { before: DocPos(6) });
+    });
+    cx.simulate_keystrokes("secondary-z");
+    cx.update(|_, cx| assert_eq!(editor.read(cx).editor().document().blocks(), original));
 }
 
 #[test]
@@ -840,4 +1436,154 @@ fn box_selection_starts_only_outside_block_bounds() {
         cx.simulate_mouse_up(first, drag, Default::default());
         cx.update(|_, cx| assert!(matches!(entity.read(cx).editor().selection(), Selection::Text { anchor, head } if anchor != head)));
     }
+}
+
+#[test]
+fn heading_moves_out_of_a_list_when_the_inner_reorder_is_invalid() {
+    use gpdoc_plugin_task_list::{task_item_with_nesting, task_list};
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_heading::heading())
+        .plugin(task_item_with_nesting(true))
+        .plugin(task_list())
+        .plugin(drag_handle())
+        .build()
+        .unwrap();
+    let body = Node::text("paragraph", "A");
+    let heading = Node::text("heading", "B");
+    let item = Node::container("taskItem", vec![body.clone(), heading]);
+    let list = Node::container("taskList", vec![item]);
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(&mut app, &config, DocumentSource::Blocks(vec![list]));
+    drag_to_block(cx, &editor, 2 + body.size(), 2, false);
+    cx.update(|_, cx| {
+        let state = editor.read(cx).editor();
+        let [heading, list] = state.document().blocks() else {
+            panic!("expected heading before list")
+        };
+        assert_eq!(heading.kind, "heading");
+        assert_eq!(list.child(0).content.children(), [body]);
+        assert_eq!(state.selection(), Selection::Node { before: DocPos(0) });
+    });
+}
+
+#[test]
+fn fallback_drop_indicator_tracks_scroll_with_a_stationary_pointer() {
+    let marker = Rc::new(Cell::new(None));
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(ViewPlugin::named("decline").on_block_drop(|_, _: &gpui::ExternalPaths, _, _| None))
+        .plugin(ViewPlugin::named("select").on_block_drop(
+            |view, _: &gpui::ExternalPaths, targets, _| {
+                let target = *targets.first()?;
+                let mut tx = view.editor().transaction();
+                tx.select(Selection::Node { before: target.at });
+                Some((target, tx))
+            },
+        ))
+        .plugin(drop_cursor().with_view({
+            let marker = marker.clone();
+            move |bounds, _, _| marker.set(Some(bounds))
+        }))
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![Node::text("paragraph", "A"); 180]),
+    );
+    let row = cx.update(|window, cx| {
+        editor.update(cx, |view, _| view.child_bounds(DocPos(6), window).unwrap())
+    });
+    let position = point(row.center().x, row.top() + px(2.));
+    cx.simulate_event(FileDropEvent::Entered {
+        position,
+        paths: Default::default(),
+    });
+    cx.simulate_event(FileDropEvent::Pending { position });
+    assert_eq!(
+        marker.take().expect("second planner's line").top(),
+        row.top()
+    );
+
+    cx.simulate_event(gpui::ScrollWheelEvent {
+        position,
+        delta: gpui::ScrollDelta::Pixels(point(px(0.), -row.size.height - px(3.))),
+        ..Default::default()
+    });
+    let (before, bounds) = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            view.child_bounds_at(position, window).unwrap()
+        })
+    });
+    assert!(before > DocPos(6));
+    assert_ne!(bounds.top(), row.top());
+    assert_eq!(
+        marker.get().expect("line after scrolling").top(),
+        bounds.top()
+    );
+    cx.simulate_event(FileDropEvent::Submit { position });
+    cx.update(|_, cx| {
+        assert_eq!(
+            editor.read(cx).editor().selection(),
+            Selection::Node { before }
+        )
+    });
+}
+
+#[test]
+fn filtered_block_drop_passes_to_the_next_handler() {
+    let fallback_called = Rc::new(Cell::new(false));
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(Plugin::new("rejectDocumentChanges", |p| {
+            p.filter_transaction(|change| {
+                Ok(change.before.is_none_or(|old| old == change.document))
+            });
+        }))
+        .plugin(ViewPlugin::named("firstDrop").on_block_drop(
+            |view, _: &gpui::ExternalPaths, targets, _| {
+                let target = *targets.first()?;
+                let doc = view.editor().document();
+                let mut tx = view.editor().transaction();
+                tx.push(Step::Replace(ReplaceStep {
+                    from: target.at.0,
+                    to: target.at.0,
+                    slice: doc.root().slice(0, doc.size(), false).unwrap(),
+                    structure: false,
+                }));
+                assert_eq!(tx.document().unwrap().blocks().len(), 2);
+                Some((target, tx))
+            },
+        ))
+        .plugin(ViewPlugin::named("fallbackDrop").on_text_drop({
+            let fallback_called = fallback_called.clone();
+            move |_, _: &gpui::ExternalPaths, _, _, _| {
+                fallback_called.set(true);
+                true
+            }
+        }))
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (editor, cx) = open_editor(
+        &mut app,
+        &config,
+        DocumentSource::Blocks(vec![Node::text("paragraph", "A")]),
+    );
+    let position = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            view.child_bounds(DocPos(0), window).unwrap().center()
+        })
+    });
+    cx.simulate_event(FileDropEvent::Entered {
+        position,
+        paths: Default::default(),
+    });
+    cx.simulate_event(FileDropEvent::Submit { position });
+    cx.update(|_, cx| {
+        assert_eq!(editor.read(cx).editor().document().blocks().len(), 1);
+    });
+    assert!(fallback_called.get());
 }

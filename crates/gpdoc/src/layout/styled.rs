@@ -22,6 +22,19 @@ enum PieceContent {
     Image(std::sync::Arc<gpui::RenderImage>, Size<Pixels>),
 }
 
+impl TextSection {
+    /// Painted top of a standalone image, including its offset inside the line.
+    pub(super) fn image_top(&self) -> Option<Pixels> {
+        let LineContent::Styled(row) = &self.lines.first()?.content else {
+            return None;
+        };
+        let [piece] = row.pieces.as_slice() else {
+            return None;
+        };
+        matches!(piece.content, PieceContent::Image(..)).then(|| self.bounds.top() + piece.origin.y)
+    }
+}
+
 impl StyledRow {
     pub(super) fn paint(&self, origin: Point<Pixels>, window: &mut Window, cx: &mut App) {
         for piece in &self.pieces {

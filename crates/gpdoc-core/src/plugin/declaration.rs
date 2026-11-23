@@ -2,9 +2,9 @@
 use super::CommandResult;
 use crate::{
     AppendTransaction, AttrSpecs, Attrs, Command, CommandContext, CommandRegistration,
-    DocumentChange, Edit, Error, FilterTransaction, Highlighter, InputRule, InputRuleContext,
-    InstalledPlugin, MarkSpec, NodeSpec, PasteHandler, PasteRule, SelectionBehavior, StoredCommand,
-    SyntaxToken,
+    DocumentChange, DragHandleScope, Edit, Error, FilterTransaction, Highlighter, InputRule,
+    InputRuleContext, InstalledPlugin, MarkSpec, NodeSpec, PasteHandler, PasteRule,
+    SelectionBehavior, StoredCommand, SyntaxToken,
 };
 use std::{any::Any, sync::Arc};
 
@@ -35,6 +35,7 @@ pub(super) enum Declaration {
     GlobalAttributes(Targets, AttrSpecs),
     SyntaxHighlight(String, Highlighter),
     AtomLabel(String, crate::AtomLabel),
+    DragHandle(String, DragHandleScope),
     Node(NodeSpec),
     Mark(MarkSpec),
     Append(AppendTransaction),
@@ -229,6 +230,27 @@ impl PluginSpec {
         self.plugin
             .declarations
             .push(Declaration::Filter(Arc::new(handler)));
+    }
+
+    /// Give this block a drag handle. Dragging any of its named direct children
+    /// moves the owner. Other children keep their own drag behavior.
+    pub fn drag_handle(
+        &mut self,
+        owner: impl Into<String>,
+        children: impl IntoIterator<Item = impl Into<String>>,
+    ) {
+        self.plugin.declarations.push(Declaration::DragHandle(
+            owner.into(),
+            DragHandleScope::Children(children.into_iter().map(Into::into).collect()),
+        ));
+    }
+
+    /// Use the owner's drag handle everywhere inside this block, at any nesting depth.
+    pub fn drag_handle_for_subtree(&mut self, owner: impl Into<String>) {
+        self.plugin.declarations.push(Declaration::DragHandle(
+            owner.into(),
+            DragHandleScope::Subtree,
+        ));
     }
 
     /// Supply an accessible text representation for a document atom.

@@ -2,6 +2,33 @@ use crate::{EditorView, layout::TextLayout};
 use gpdoc_core::{DocPos, Document, Node};
 use gpui::{Bounds, Pixels, Point, Window};
 
+/// A candidate insertion boundary and the horizontal line drawn for it.
+#[derive(Clone, Copy, Debug)]
+pub struct BlockDropTarget {
+    /// Start of the measured block supplying this edge, or None for a viewport fallback.
+    pub block_before: Option<DocPos>,
+    pub at: DocPos,
+    pub indicator: Bounds<Pixels>,
+}
+
+impl BlockDropTarget {
+    fn edge(before: DocPos, node: &Node, rect: Bounds<Pixels>, y: Pixels) -> Self {
+        let (at, y) = if y < rect.center().y {
+            (before, rect.top())
+        } else {
+            (DocPos(before.0 + node.size()), rect.bottom())
+        };
+        Self {
+            block_before: Some(before),
+            at,
+            indicator: Bounds::new(
+                gpui::point(rect.left(), y),
+                gpui::size(rect.size.width, gpui::px(2.)),
+            ),
+        }
+    }
+}
+
 pub(super) fn blocks(doc: &Document) -> impl Iterator<Item = (DocPos, &Node)> {
     doc.blocks().iter().scan(0, |at, node| {
         let before = DocPos(*at);
@@ -86,20 +113,72 @@ impl EditorView {
         if !self.scroll.bounds().contains(&mouse) {
             return None;
         }
-        if self.inline_drop_target {
-            let at = layout.index_for_point(mouse);
-            let rect = layout.bounds_for_range(at..at)?;
-            Some(Bounds::new(
-                rect.origin,
-                gpui::size(gpui::px(2.), rect.size.height),
-            ))
-        } else {
-            let (_, y) = self.drop_boundary(layout, mouse)?;
-            Some(Bounds::new(
-                gpui::point(layout.bounds.left(), y),
-                gpui::size(layout.bounds.size.width, gpui::px(2.)),
-            ))
+        match self.drop_indicator_kind {
+            super::DropIndicator::Text => {
+                let at = layout.index_for_point(mouse);
+                let rect = layout.bounds_for_range(at..at)?;
+                Some(Bounds::new(
+                    rect.origin,
+                    gpui::size(gpui::px(2.), rect.size.height),
+                ))
+            }
+            super::DropIndicator::Block(marker) => marker,
         }
+    }
+
+    /// Edges under the pointer, from the innermost rendered block to the document.
+    pub(super) fn block_drop_targets(
+        &mut self,
+        point: Point<Pixels>,
+        window: &mut Window,
+    ) -> Vec<BlockDropTarget> {
+        self.geometry(window);
+        self.layout.as_ref().map_or_else(Vec::new, |layout| {
+            self.block_drop_targets_in_layout(point, layout)
+        })
+    }
+
+    pub(super) fn block_drop_targets_in_layout(
+        &self,
+        point: Point<Pixels>,
+        layout: &TextLayout,
+    ) -> Vec<BlockDropTarget> {
+        if self.is_composing() || !self.scroll.bounds().contains(&point) {
+            return Vec::new();
+        }
+        let hit = layout.child_bounds_at(point);
+        let doc = self.editor().document();
+        let mut targets = Vec::new();
+        if let Some((before, rect)) = hit
+            && let Ok(pos) = doc.resolve(before)
+            && let Some(node) = doc.node_at(before)
+        {
+            if !node.is_leaf() && !node.inline_content() && node.child_count() == 0 {
+                targets.push(BlockDropTarget {
+                    block_before: Some(before),
+                    at: DocPos(before.0 + 1),
+                    indicator: Bounds::new(rect.origin, gpui::size(rect.size.width, gpui::px(2.))),
+                });
+            }
+            targets.push(BlockDropTarget::edge(before, node, rect, point.y));
+            for depth in (1..=pos.depth()).rev() {
+                let before = DocPos(pos.before(depth).expect("ancestor has a boundary"));
+                let node = pos.node(depth);
+                if let Some(rect) = block_bounds(self, layout, before, node) {
+                    targets.push(BlockDropTarget::edge(before, node, rect, point.y));
+                }
+            }
+        } else if let Some((at, y)) = self.drop_boundary(layout, point) {
+            targets.push(BlockDropTarget {
+                block_before: None,
+                at,
+                indicator: Bounds::new(
+                    gpui::point(layout.bounds.left(), y),
+                    gpui::size(layout.bounds.size.width, gpui::px(2.)),
+                ),
+            });
+        }
+        targets
     }
 
     pub(crate) fn drop_boundary(

@@ -91,6 +91,7 @@ pub(crate) type ChildRenderer = Rc<
 
 #[derive(Default)]
 pub(crate) struct BlockViews {
+    pub(crate) measure_all: bool,
     pub(crate) layouts: BTreeMap<String, ChildRenderer>,
     pub(crate) wrappers: BTreeMap<String, Vec<ContentRenderer>>,
     pub(crate) top_level_wrappers: Vec<ContentRenderer>,

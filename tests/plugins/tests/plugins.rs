@@ -52,6 +52,38 @@ fn select_text_start(editor: &mut Editor, text: &str) {
 }
 
 #[test]
+fn list_items_own_their_paragraphs_but_nested_items_remain_independent() {
+    let outer = Node::container(
+        "listItem",
+        vec![
+            paragraph("first"),
+            paragraph("second"),
+            list(vec![item("inner")]),
+            Node::text("heading", "heading"),
+        ],
+    );
+    let editor = editor(vec![list(vec![outer])]);
+    let doc = editor.document();
+    let blocks: Vec<_> = doc.iter_blocks().map(|(pos, _)| pos).collect();
+    let owners: Vec<_> = blocks
+        .iter()
+        .map(|&pos| {
+            editor
+                .config()
+                .drag_handle_owner(&doc.resolve(pos).unwrap())
+                .unwrap()
+        })
+        .collect();
+    let [list, outer, _, _, sublist, inner, _, heading] = blocks[..] else {
+        panic!("fixture block structure")
+    };
+    assert_eq!(
+        owners,
+        [list, outer, outer, outer, sublist, inner, inner, heading]
+    );
+}
+
+#[test]
 fn lists_wrap_and_lift_an_item_between_two_siblings() {
     let mut ed = editor(vec![paragraph("one"), paragraph("two"), paragraph("three")]);
     ed.select(Selection::Text {

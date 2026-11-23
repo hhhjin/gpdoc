@@ -15,6 +15,7 @@ unit_command!(pub Lift, "liftListItem");
 pub fn list_item() -> Plugin {
     let plugin = Plugin::new("listItem", |p| {
         p.node(NodeSpec::block(LIST_ITEM).content("paragraph block*"));
+        p.drag_handle(LIST_ITEM, ["paragraph"]);
         p.command::<Split>(|ctx, _| split_item(ctx, LIST_ITEM));
         p.on_break(LIST_ITEM, |ctx| ctx.plan(Split));
         p.command::<Sink>(|ctx, _| sink_item(ctx, LIST_ITEM));

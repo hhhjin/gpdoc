@@ -23,6 +23,21 @@ impl ViewFrame<'_> {
             .filter(|r| self.clip.intersects(r))
     }
 
+    /// The innermost measured block under the pointer, respecting layout clips.
+    pub fn block_at(&self, point: Point<Pixels>) -> Option<DocPos> {
+        self.layout.child_bounds_at(point).map(|(before, _)| before)
+    }
+
+    /// Current allocation of a measured block.
+    pub fn block_bounds(&self, before: DocPos) -> Option<Bounds<Pixels>> {
+        self.layout.child_bounds(before)
+    }
+
+    /// Top of the block's first line, rendered object, or child layout inside its wrappers.
+    pub fn block_content_top(&self, before: DocPos) -> Option<Pixels> {
+        self.layout.child_content_top(before)
+    }
+
     /// Insertion marker for a drag over the editor viewport.
     pub fn drop_indicator_at(&self, position: Point<Pixels>, cx: &App) -> Option<Bounds<Pixels>> {
         self.view.read(cx).drop_indicator(self.layout, position)

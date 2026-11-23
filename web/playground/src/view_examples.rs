@@ -64,7 +64,16 @@ fn example(name: &str) -> Result<Example, JsError> {
             config = config
                 .plugin(gpdoc_plugin_drag_handle::drag_handle().with_view(|_, _, _| "≡"))
                 .plugin(gpdoc_plugin_drop_cursor::drop_cursor());
-            paragraphs(&["Draft the outline", "Review the draft", "Publish the notes"])
+            config =
+                config.plugin(gpdoc_plugin_blockquote::blockquote().with_view(block_views::quote));
+            vec![
+                Node::text("paragraph", "Draft the outline"),
+                Node::container(
+                    "blockquote",
+                    paragraphs(&["Review the draft", "Collect feedback"]),
+                ),
+                Node::text("paragraph", "Publish the notes"),
+            ]
         }
         "file-handler" => {
             use gpdoc_plugin_file_handler::{FileInput, file_handler};

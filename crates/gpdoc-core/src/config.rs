@@ -79,6 +79,12 @@ impl InstalledPlugin {
 
 pub(crate) type AtomLabel = Arc<dyn Fn(&Attrs) -> String + Send + Sync>;
 
+#[derive(Clone)]
+pub(crate) enum DragHandleScope {
+    Children(Vec<String>),
+    Subtree,
+}
+
 /// Ordered runtime handlers and host data for an editor config. All are optional.
 #[derive(Default)]
 pub(crate) struct EditorHooks {
@@ -94,6 +100,7 @@ pub(crate) struct EditorHooks {
     pub filters: Vec<FilterTransaction>,
     pub shortcuts: BTreeMap<Shortcut, Vec<StoredCommand>>,
     pub presentation: Presentation,
+    pub drag_handles: BTreeMap<String, DragHandleScope>,
     pub atom_labels: BTreeMap<String, AtomLabel>,
 }
 
@@ -166,6 +173,13 @@ impl EditorConfig {
                 )));
             }
         }
+        for owner in hooks.drag_handles.keys() {
+            if !schema.node_type(owner).is_some_and(|ty| ty.is_block()) {
+                return Err(Error::InvalidSchema(format!(
+                    "drag handle requires a block node '{owner}'"
+                )));
+            }
+        }
         for kind in hooks.atom_labels.keys() {
             if !schema
                 .node_type(kind)
@@ -198,6 +212,33 @@ impl EditorConfig {
     pub fn plugin_data<T: Any>(&self) -> impl Iterator<Item = (&str, &T)> {
         self.installed_plugins()
             .filter_map(|plugin| Some((plugin.name(), plugin.data()?)))
+    }
+
+    /// Resolve a boundary before a block to the block moved by its gutter handle.
+    pub fn drag_handle_owner(&self, hit: &crate::ResolvedPos) -> Option<DocPos> {
+        let rules = &self.0.hooks.drag_handles;
+        let mut owner = None;
+        let mut parent_scope: Option<&DragHandleScope> = None;
+        for depth in 0..=hit.depth() {
+            let parent = hit.node(depth);
+            let node = parent.content.maybe_child(hit.index(depth))?;
+            let ty = self.schema().node_type(&node.kind)?;
+            if !ty.is_block() {
+                return None;
+            }
+            let scope = rules.get(&node.kind);
+            let uses_parent = matches!(parent_scope, Some(DragHandleScope::Children(body)) if body.contains(&node.kind));
+            if !uses_parent
+                && (depth == 0 || scope.is_some() || ty.in_group("block") || ty.spec.draggable)
+            {
+                owner = Some(DocPos(hit.before(depth + 1).ok()?));
+            }
+            if matches!(scope, Some(DragHandleScope::Subtree)) {
+                return owner;
+            }
+            parent_scope = scope;
+        }
+        owner
     }
 
     /// Return a plugin-provided text alternative for an atomic node.

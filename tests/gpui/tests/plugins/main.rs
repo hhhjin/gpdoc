@@ -38,6 +38,29 @@ fn open_editor(
     (view, cx)
 }
 
+fn hover_block(
+    cx: &mut VisualTestContext,
+    editor: &Entity<EditorView>,
+    before: usize,
+    gutter: bool,
+) {
+    let bounds = cx.update(|window, cx| {
+        editor.update(cx, |view, _| {
+            view.child_bounds(DocPos(before), window).unwrap()
+        })
+    });
+    let x = if gutter {
+        bounds.left() + gpui::px(1.)
+    } else {
+        bounds.center().x
+    };
+    cx.simulate_mouse_move(
+        gpui::point(x, bounds.top() + gpui::px(2.)),
+        None,
+        Default::default(),
+    );
+}
+
 #[test]
 fn open_rejects_invalid_content_before_initializing_view_behaviors() {
     use std::{cell::Cell, rc::Rc};
@@ -109,8 +132,9 @@ fn disclosure_click_and_undo() {
     let disclosure = cx
         .debug_bounds("gpdoc-disclosure-1")
         .expect("summary disclosure");
+    hover_block(cx, &entity, 0, true);
     let drag = cx
-        .debug_bounds("gpdoc-drag-0")
+        .debug_bounds("gpdoc-drag-handle")
         .expect("details drag handle");
     assert!(
         !drag.intersects(&disclosure),
@@ -182,14 +206,20 @@ fn task_checkbox_click_and_undo() {
     let checkbox = cx
         .debug_bounds("gpdoc-task-checkbox-4")
         .expect("task checkbox");
-    let handle = cx.debug_bounds("gpdoc-drag-3").expect("task list handle");
+    hover_block(cx, &entity, 3, true);
+    let handle = cx
+        .debug_bounds("gpdoc-drag-handle")
+        .expect("task list handle");
     assert!(
         !handle.intersects(&checkbox),
         "checkbox and drag must accept clicks independently"
     );
+    hover_block(cx, &entity, 5, false);
     assert!(
-        cx.debug_bounds("gpdoc-drag-4").is_none(),
-        "nested task items share the list handle"
+        !cx.debug_bounds("gpdoc-drag-handle")
+            .expect("task item handle")
+            .intersects(&checkbox),
+        "the nested handle leaves the checkbox clickable"
     );
     cx.simulate_click(checkbox.center(), Default::default());
     cx.update(|_, cx| {

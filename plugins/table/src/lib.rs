@@ -63,6 +63,7 @@ impl Command for ResizeColumn {
 pub fn table() -> Plugin {
     let plugin = Plugin::new("table", |p| {
         p.node(NodeSpec::block("table").group("block").content("tableRow+"));
+        p.drag_handle_for_subtree("table");
         p.node(NodeSpec::block("tableRow").content("(tableCell | tableHeader)*"));
         p.node(cell_type("tableCell"));
         p.node(cell_type("tableHeader"));

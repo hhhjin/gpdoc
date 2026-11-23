@@ -80,6 +80,6 @@ Return `Some(AnchoredElement::above(bounds, element))` for a menu above a select
 
 ## Handle a block drop
 
-Use `ViewPlugin::named(name).wrap_blocks(...)` to place a control beside each top-level block. Put the supplied editable body in the wrapper once. A drag handle can use the block's `before` position to identify the block when a drag starts.
+Use `ViewPlugin::named(name).wrap_blocks(...)` to place a control beside each top-level block. Put the supplied editable body in the wrapper once. For a single editor-wide control, use `ViewBehavior::render` and return an `AnchoredElement`.
 
-Register `.on_block_drop(...)` on that plugin to receive the typed drag payload and the destination document position. Apply the move as an editor transaction and return whether the drop succeeded. The [drag handle implementation](/source/plugins/drag-handle/src/lib.rs.txt) checks that the drag belongs to the same editor and document revision before moving blocks.
+Register `.on_block_drop(...)` to receive the typed drag payload and candidate boundaries under the pointer, innermost first. Return the chosen boundary and its transaction, or `None` to pass. Block drag payloads must implement `Clone` so the editor can recompute the insertion line when the viewport scrolls or the layout changes. During hover and on release, the editor tries block planners in registration order until one accepts. The [drag handle implementation](/source/plugins/drag-handle/src/lib.rs.txt) checks that the drag belongs to the same editor and document revision before moving blocks.

@@ -70,6 +70,9 @@ impl EditorView {
             .track_focus(&self.focus)
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
+            .when(self.block_views.measure_all, |surface| {
+                surface.on_hover(|_, window, _| window.refresh())
+            })
             .cursor(CursorStyle::IBeam)
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
             .on_mouse_move(cx.listener(Self::mouse_move))

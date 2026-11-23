@@ -10,12 +10,12 @@ pub fn block_spacing() -> ViewPlugin {
             "horizontalRule" => 12.,
             _ => 4.,
         };
-        div().group("demo-block").pt(px(top)).pb(px(3.)).child(body)
+        div().pt(px(top)).pb(px(3.)).child(body)
     })
 }
 
 pub fn drag_handle() -> ViewPlugin {
-    gpdoc_plugin_drag_handle::drag_handle().with_view(|slot, _, _| {
+    gpdoc_plugin_drag_handle::drag_handle().with_view(|_, _, _| {
         let dot = || div().size(px(3.)).rounded_full().bg(rgb(0x9b9a97));
         div()
             .w(px(16.))
@@ -25,13 +25,6 @@ pub fn drag_handle() -> ViewPlugin {
             .items_center()
             .justify_center()
             .gap(px(2.))
-            .when(
-                slot.part == gpdoc_plugin_drag_handle::DragHandlePart::Grip,
-                |el| {
-                    el.opacity(0.)
-                        .group_hover("demo-block", |style| style.opacity(1.))
-                },
-            )
             .children((0..3).map(|_| div().flex().gap(px(2.)).child(dot()).child(dot())))
     })
 }

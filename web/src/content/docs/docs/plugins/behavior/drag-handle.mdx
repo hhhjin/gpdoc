@@ -1,13 +1,13 @@
 ---
 title: Drag handle
-description: Move top-level blocks by dragging a handle in the editor gutter.
+description: Move blocks within and between containers using their gutter handles.
 ---
 
 import ViewPluginExample from "../../../../../components/ViewPluginExample.astro";
 
 ## Try it
 
-Drag the handle beside “Review the draft” above “Draft the outline” to swap their order.
+Hover over “Collect feedback” and use the handle on the left to move the whole quote. Then drag “Publish the notes” between the two quoted paragraphs.
 
 <ViewPluginExample plugin="drag-handle" title="Drag handle example" />
 
@@ -19,35 +19,17 @@ Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
 cargo add gpdoc-plugin-drag-handle
 ```
 
-Bare `.plugin(drag_handle())` displays a grip in the gutter. Supply a view to customize the grip and drag preview.
-
 ```rust
 use gpdoc_plugin_drag_handle::drag_handle;
 use gpdoc_plugin_paragraph::paragraph;
 
-mod handles;
-
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(drag_handle().with_view(handles::block_handle))
+    .plugin(drag_handle())
     .build()?;
 ```
 
-Compose the gutter grip and the preview in `handles.rs`. The plugin attaches the drag gesture, keeps the editor focused, and moves the block when the drag ends. Use `slot.editor` and `slot.before` to look up the originating block.
-
-```rust
-use gpdoc_plugin_drag_handle::{DragHandlePart, DragHandleSlot};
-use gpui::{App, Window, div, prelude::*};
-
-pub fn block_handle(slot: DragHandleSlot, _: &mut Window, _: &mut App) -> gpui::Div {
-    div().child(match slot.part {
-        DragHandlePart::Grip => "⠿",
-        DragHandlePart::Preview => "Move block",
-    })
-}
-```
-
-Drag a block's gutter handle to another block boundary in the same editor. If the handle is inside a selected [node range](/docs/plugins/behavior/node-range/), the selected blocks move together.
+To customize the handle and drag preview, pass a renderer to `drag_handle().with_view(...)`.
 
 ## Source code
 

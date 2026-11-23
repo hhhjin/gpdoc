@@ -57,7 +57,7 @@ impl InputBuffer {
             if let Some(selection) = next_selection {
                 tx.select(selection)
             }
-            return self.apply_node_view(tx);
+            return self.apply_node_view(tx).map(|_| ());
         }
         if let Some(selection) = next_selection {
             self.editor.select(selection)?
