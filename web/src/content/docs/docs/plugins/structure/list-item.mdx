@@ -120,7 +120,7 @@ Pass a valid regular expression matching the marker from the start of the paragr
 
 ## Compose a GPUI view
 
-With the `gpui` feature, `list_item()` displays a bullet or a decimal number next to each editable item by default. To customize the layout, enable `gpui` on `gpdoc-plugin-list-item` and attach a view using `gpdoc::PluginViewExt`.
+With the `gpui` feature, `list_item()` displays a bullet or a decimal number next to each editable item by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(list_item().with_view(views::item))

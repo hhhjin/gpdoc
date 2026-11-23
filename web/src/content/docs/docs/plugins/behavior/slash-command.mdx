@@ -15,7 +15,7 @@ Click the empty paragraph and type `/h1`. Press **Enter**, then type a title in 
 
 ## Register your commands
 
-Enable the `gpui` feature on `gpdoc-plugin-slash-command`. Register `slash_commands(entries)` to use the default GPUI list. The default menu displays matching command labels and marks the active row. Each item binds a command supplied by another plugin. This example adds a heading command to the [Quickstart editor](/docs/quickstart/#configure-the-editor).
+Register `slash_commands(entries)` to use the default GPUI list. The default menu displays matching command labels and marks the active row. Each item binds a command supplied by another plugin. This example adds a heading command to the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
 use gpdoc_plugin_heading::{heading, Level, Set};

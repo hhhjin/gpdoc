@@ -123,4 +123,4 @@ editor.run(gpdoc_plugin_link::Unset)?;
 
 ## Native appearance
 
-Enable the `gpui` feature on `gpdoc-plugin-link`. In a GPUI editor, `link(options)` underlines links in the inherited text color. To enable double-click and primary-modifier click, import `gpdoc::PluginViewExt` and use `link(options).with_view(|| [link_format(), link_activation()])`. Add `link_popover(render)` to the array for controls at the caret. Its callback receives the link attributes, document range and editor handle.
+In a GPUI editor, `link(options)` underlines links in the inherited text color. To enable double-click and primary-modifier click, import `gpdoc::PluginViewExt` and use `link(options).with_view(|| [link_format(), link_activation()])`. Add `link_popover(render)` to the array for controls at the caret. Its callback receives the link attributes, document range and editor handle.

@@ -43,7 +43,7 @@ The example keeps a stable record ID, `user-42`, alongside the label shown to re
 
 ## Compose the picker and inserted chip
 
-Enable the `gpui` feature on `gpdoc-plugin-mention`. Registering `mention()` displays each stored trigger and label, such as `@Ada`. Its default picker searches the records contributed by installed plugins. The menu appears only when a query matches a record.
+Registering `mention()` displays each stored trigger and label, such as `@Ada`. Its default picker searches the records contributed by installed plugins. The menu appears only when a query matches a record.
 
 For a fixed list, contribute a `MentionCatalog` to the config. Users can navigate the plain text list with arrow keys and accept a record with Enter or a click.
 

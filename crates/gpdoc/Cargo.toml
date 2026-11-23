@@ -25,5 +25,6 @@ gpui = { workspace = true, optional = true, features = ["font-kit", "wayland", "
 gpui-browser = { workspace = true, optional = true }
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpui", "dep:gpui-browser", "dep:latex-rust", "dep:thiserror", "dep:unicode-bidi", "dep:unicode-segmentation", "dep:url"]
 native-tests = ["gpui", "gpui/test-support"]

@@ -80,7 +80,7 @@ Type `>` followed by a space at the start of a paragraph. The editor removes the
 
 ## Compose a GPUI view
 
-Blockquotes display their editable children in document order by default. To customize the layout, enable `gpui` on `gpdoc-plugin-blockquote` and attach a view using `gpdoc::PluginViewExt`.
+Blockquotes display their editable children in document order by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(blockquote().with_view(views::quote))

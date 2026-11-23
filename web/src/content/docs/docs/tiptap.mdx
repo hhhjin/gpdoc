@@ -15,7 +15,7 @@ This example supports paragraphs, text, and the `bold` and `italic` marks. Chang
 
 ## Open and save a document in GPUI
 
-In your Tiptap app, call `JSON.stringify(editor.getJSON())` to get the document string. Pass that string as `source` when creating the GPUI editor view. For the document above, register Paragraph, Bold, and Italic. After completing [Configure the editor](/docs/quickstart/#configure-the-editor), run `cargo add gpdoc-plugin-italic --features gpui`.
+In your Tiptap app, call `JSON.stringify(editor.getJSON())` to get the document string. Pass that string as `source` when creating the GPUI editor view. For the document above, register Paragraph, Bold, and Italic. After completing [Configure the editor](/docs/quickstart/#configure-the-editor), run `cargo add gpdoc-plugin-italic`.
 
 ```rust
 use gpdoc::{DocumentSource, EditorConfig, EditorView};

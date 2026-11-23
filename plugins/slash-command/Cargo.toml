@@ -15,4 +15,5 @@ gpdoc-plugin.workspace = true
 gpdoc-plugin-suggestion.workspace = true
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpdoc", "gpdoc-plugin-suggestion/gpui"]

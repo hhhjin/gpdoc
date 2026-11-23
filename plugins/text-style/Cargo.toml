@@ -10,6 +10,7 @@ readme.workspace = true
 description = "Text styles, colors, fonts and line heights for the gpdoc rich-text editor"
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpdoc", "dep:svgtypes"]
 
 [dependencies]

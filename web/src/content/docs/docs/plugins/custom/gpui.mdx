@@ -10,9 +10,9 @@ Display a label above each [caption block](/docs/plugins/custom/first-plugin/). 
 In `gpdoc-writing`, add the dependencies for a Cargo example. The paragraph plugin is already a development dependency from the first guide. For system prerequisites, see the [quickstart](/docs/quickstart/).
 
 ```sh
-cargo add --dev gpdoc --features gpui
+cargo add --dev gpdoc
 cargo add --dev gpui@=0.2.2
-cargo add --dev gpdoc-plugin-paragraph --features gpui
+cargo add --dev gpdoc-plugin-paragraph
 ```
 
 Create `examples/caption/view.rs` for the caption component.

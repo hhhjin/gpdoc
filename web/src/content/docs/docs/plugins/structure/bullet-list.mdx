@@ -70,7 +70,7 @@ At the start of a paragraph, type `-`, `+`, or `*` followed by a space. The inpu
 
 ## Compose a GPUI view
 
-A bullet list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic bullet markers. To customize the layout, enable `gpui` on `gpdoc-plugin-bullet-list` and attach a view using `gpdoc::PluginViewExt`.
+A bullet list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic bullet markers. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(bullet_list().with_view(views::bullets))

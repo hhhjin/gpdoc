@@ -188,4 +188,4 @@ editor.run(gpdoc_plugin_text_style::RemoveEmpty)?;
 
 ## Native appearance
 
-Enable the `gpui` feature on `gpdoc-plugin-text-style`. In a GPUI editor, `text_style()` renders the color, font and line-height attributes installed on the mark. The property plugins also render their own attribute on additional node or mark types passed to `StyleProperty::on`. To replace the mark’s appearance, import `gpdoc::PluginViewExt` and register `text_style().with_view(my_text_style_view)`. Override a custom target’s formatter on its property plugin.
+In a GPUI editor, `text_style()` renders the color, font and line-height attributes installed on the mark. The property plugins also render their own attribute on additional node or mark types passed to `StyleProperty::on`. To replace the mark’s appearance, import `gpdoc::PluginViewExt` and register `text_style().with_view(my_text_style_view)`. Override a custom target’s formatter on its property plugin.

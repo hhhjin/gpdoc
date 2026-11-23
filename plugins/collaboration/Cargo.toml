@@ -19,6 +19,7 @@ thiserror = "2"
 web-time = "1"
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpdoc", "dep:gpui", "dep:gpui-browser"]
 
 [dev-dependencies]

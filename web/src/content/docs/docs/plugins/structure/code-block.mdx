@@ -80,7 +80,7 @@ Start a paragraph with three backticks or three tildes and press Space. To choos
 
 ## Compose a GPUI view
 
-Code blocks display editable lines using the editor’s typography by default. To customize the layout, enable `gpui` on `gpdoc-plugin-code-block` and attach a view using `gpdoc::PluginViewExt`.
+Code blocks display editable lines using the editor’s typography by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(code_block().with_view(views::code))

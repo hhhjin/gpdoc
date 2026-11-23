@@ -15,6 +15,7 @@ gpdoc-plugin.workspace = true
 gpdoc-plugin-list-item.workspace = true
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpdoc", "dep:gpui", "dep:gpui-browser"]
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

@@ -9,6 +9,15 @@ license.workspace = true
 readme.workspace = true
 description = "gpdoc support for the list plugin bundle"
 
+[features]
+default = ["gpui"]
+gpui = [
+    "gpdoc-plugin-bullet-list/gpui",
+    "gpdoc-plugin-list-item/gpui",
+    "gpdoc-plugin-ordered-list/gpui",
+    "gpdoc-plugin-task-list/gpui",
+]
+
 [dependencies]
 gpdoc-plugin.workspace = true
 gpdoc-plugin-bullet-list.workspace = true

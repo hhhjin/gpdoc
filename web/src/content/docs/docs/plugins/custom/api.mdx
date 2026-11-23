@@ -128,7 +128,7 @@ A transaction belongs to the editor and draft it came from. Applying one from an
 
 ## GPUI view plugins
 
-Use `gpdoc::EditorConfig::builder().plugin(feature())` to register a feature with its default GPUI view. Enable the crate's `gpui` feature when it offers one. To replace the default, import `gpdoc::PluginViewExt` and pass a renderer to `.with_view(...)`. A factory can return a `ViewPlugin`, an array, or a vector when a feature has several parts. For example, a mention view can supply both a chip and a picker.
+Use `gpdoc::EditorConfig::builder().plugin(feature())` to register a feature with its default GPUI view. To replace the default, import `gpdoc::PluginViewExt` and pass a renderer to `.with_view(...)`. A factory can return a `ViewPlugin`, an array, or a vector when a feature has several parts. For example, a mention view can supply both a chip and a picker.
 
 Plugin authors can supply a default by importing `gpdoc::PluginViewExt` and calling `plugin.gpui_default_view(factory)` in the crate’s `gpui` feature. In a GPUI editor, nodes with no specialized view still display their text and children, and atoms use their semantic labels. A custom view replaces the plugin's entire default composition. Include each part you want to keep.
 

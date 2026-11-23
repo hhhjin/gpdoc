@@ -78,7 +78,7 @@ At the start of a paragraph, type a number, a period, and a space. After a list 
 
 ## Compose a GPUI view
 
-An ordered list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic numbers, which start at the list’s `start` attribute. To customize the layout, enable `gpui` on `gpdoc-plugin-ordered-list` and attach a view using `gpdoc::PluginViewExt`.
+An ordered list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic numbers, which start at the list’s `start` attribute. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(ordered_list().with_view(views::numbered))

@@ -21,7 +21,7 @@ cargo add gpdoc-plugin-collaboration-caret
 
 ## Draw remote selections in GPUI
 
-Enable native caret rendering with `cargo add gpdoc-plugin-collaboration-caret --features gpui`. Register `collaboration_carets` on an editor with the schema used by the collaboration session. The supplied function resolves remote selections against that session on each paint.
+Install the caret plugin with `cargo add gpdoc-plugin-collaboration-caret`. Register `collaboration_carets` on an editor with the schema used by the collaboration session. The supplied function resolves remote selections against that session on each paint.
 
 ```rust
 use gpdoc::EditorConfig;

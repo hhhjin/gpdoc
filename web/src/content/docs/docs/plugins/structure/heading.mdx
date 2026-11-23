@@ -75,7 +75,7 @@ editor.run(Toggle(level))?;
 
 ## Compose a GPUI view
 
-Headings inherit the editor’s typography by default. To customize the layout, enable `gpui` on `gpdoc-plugin-heading` and attach a view using `gpdoc::PluginViewExt`.
+Headings inherit the editor’s typography by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
 
 ```rust
 .plugin(heading().with_view(views::heading))

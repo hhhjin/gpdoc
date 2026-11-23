@@ -113,4 +113,4 @@ Typing `==important==` highlights the word between the delimiters.
 
 ## Native appearance
 
-Enable the `gpui` feature on `gpdoc-plugin-highlight`. In a GPUI editor, `multicolor_highlight()` uses the CSS color stored on each mark. An uncolored mark inherits its background. To choose a fallback for marks with a missing or invalid color, import `gpdoc::PluginViewExt` and register `highlight().with_view(|| highlight_format([255, 232, 135]))` or attach the same view to `multicolor_highlight()`.
+In a GPUI editor, `multicolor_highlight()` uses the CSS color stored on each mark. An uncolored mark inherits its background. To choose a fallback for marks with a missing or invalid color, import `gpdoc::PluginViewExt` and register `highlight().with_view(|| highlight_format([255, 232, 135]))` or attach the same view to `multicolor_highlight()`.

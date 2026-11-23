@@ -10,6 +10,7 @@ readme.workspace = true
 description = "Image plugin for the gpdoc rich-text editor"
 
 [features]
+default = ["gpui"]
 gpui = ["dep:gpdoc", "dep:gpui", "dep:gpui-browser"]
 
 [dependencies]
