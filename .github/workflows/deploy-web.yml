@@ -26,6 +26,7 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: web/package.json
@@ -35,7 +36,9 @@ jobs:
       - name: Install the matching wasm-bindgen CLI
         run: |
           version=$(bun -e 'console.log(Bun.TOML.parse(await Bun.file("../Cargo.lock").text()).package.find(p => p.name === "wasm-bindgen").version)')
-          cargo install wasm-bindgen-cli --locked --version "=$version"
+          if [[ "$(wasm-bindgen --version 2>/dev/null)" != "wasm-bindgen $version" ]]; then
+            cargo install wasm-bindgen-cli --locked --version "=$version" --force
+          fi
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run wrangler deploy
