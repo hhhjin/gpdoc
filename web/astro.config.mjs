@@ -90,6 +90,7 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "docs" },
             { slug: "docs/quickstart" },
+            { slug: "docs/lists" },
           ],
         },
         {

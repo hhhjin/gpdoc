@@ -228,7 +228,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for plugin in &case.plugins {
             let entry = match plugin.as_str() {
                 "ListKit" => {
-                    plugins.extend(gpdoc_plugin_list_kit::list_kit());
+                    plugins.extend([
+                        Plugin::from(bullet_list()),
+                        Plugin::from(list_item()),
+                        Plugin::from(gpdoc_plugin_list_keymap::list_keymap()),
+                        Plugin::from(ordered_list()),
+                        Plugin::from(gpdoc_plugin_task_list::task_item()),
+                        Plugin::from(gpdoc_plugin_task_list::task_list()),
+                    ]);
                     continue;
                 }
                 "TextStyleKit" => {

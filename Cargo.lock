@@ -2522,7 +2522,6 @@ dependencies = [
  "gpdoc-plugin-link",
  "gpdoc-plugin-list-item",
  "gpdoc-plugin-list-keymap",
- "gpdoc-plugin-list-kit",
  "gpdoc-plugin-markdown",
  "gpdoc-plugin-mathematics",
  "gpdoc-plugin-mention",
@@ -2583,7 +2582,6 @@ dependencies = [
  "gpdoc-plugin-link",
  "gpdoc-plugin-list-item",
  "gpdoc-plugin-list-keymap",
- "gpdoc-plugin-list-kit",
  "gpdoc-plugin-markdown",
  "gpdoc-plugin-mathematics",
  "gpdoc-plugin-mention",
@@ -2923,18 +2921,6 @@ version = "0.1.0"
 dependencies = [
  "gpdoc-plugin",
  "gpdoc-plugin-list-item",
-]
-
-[[package]]
-name = "gpdoc-plugin-list-kit"
-version = "0.1.0"
-dependencies = [
- "gpdoc-plugin",
- "gpdoc-plugin-bullet-list",
- "gpdoc-plugin-list-item",
- "gpdoc-plugin-list-keymap",
- "gpdoc-plugin-ordered-list",
- "gpdoc-plugin-task-list",
 ]
 
 [[package]]

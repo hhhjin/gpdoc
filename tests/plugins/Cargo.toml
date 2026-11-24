@@ -28,7 +28,6 @@ gpdoc-plugin-italic.workspace = true
 gpdoc-plugin-link.workspace = true
 gpdoc-plugin-list-item.workspace = true
 gpdoc-plugin-list-keymap.workspace = true
-gpdoc-plugin-list-kit.workspace = true
 gpdoc-plugin-markdown = { path = "../../plugins/markdown" }
 gpdoc-plugin-mathematics.workspace = true
 gpdoc-plugin-mention.workspace = true

@@ -63,7 +63,6 @@ gpdoc-plugin-code-block-lowlight.workspace = true
 gpdoc-plugin-collaboration = { workspace = true, default-features = true }
 gpdoc-plugin-collaboration-caret = { workspace = true, default-features = true }
 gpdoc-plugin-find-and-replace = { workspace = true, default-features = true }
-gpdoc-plugin-list-kit = { workspace = true, default-features = true }
 gpdoc-plugin-markdown = { path = "../../plugins/markdown" }
 gpdoc-plugin-ruby-text = { workspace = true, default-features = true }
 gpdoc-plugin-suggestion = { workspace = true, default-features = true }
