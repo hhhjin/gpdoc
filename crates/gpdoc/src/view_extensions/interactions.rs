@@ -61,6 +61,11 @@ pub(super) fn block_bounds(
 }
 
 impl EditorView {
+    /// Document origin in window coordinates at the last layout.
+    pub fn document_origin(&self) -> Option<Point<Pixels>> {
+        Some(self.layout.as_ref()?.bounds.origin)
+    }
+
     /// Resolve a screen point to its document position in the current layout.
     pub fn position_at(&mut self, point: Point<Pixels>, window: &mut Window) -> Option<DocPos> {
         let offset = self.geometry(window)?.index_for_point(point);

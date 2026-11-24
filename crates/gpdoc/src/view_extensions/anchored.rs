@@ -23,6 +23,11 @@ impl ViewFrame<'_> {
             .filter(|r| self.clip.intersects(r))
     }
 
+    /// Document origin in window coordinates for this frame.
+    pub fn document_origin(&self) -> Point<Pixels> {
+        self.layout.bounds.origin
+    }
+
     /// The innermost measured block under the pointer, respecting layout clips.
     pub fn block_at(&self, point: Point<Pixels>) -> Option<DocPos> {
         self.layout.child_bounds_at(point).map(|(before, _)| before)

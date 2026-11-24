@@ -434,6 +434,18 @@ impl EditorView {
         Ok(())
     }
 
+    /// Set a document selection while preserving the viewport during a pointer gesture.
+    pub fn select_document_in_place(
+        &mut self,
+        selection: Selection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), Error> {
+        self.select_document(selection, window, cx)?;
+        self.reveal_head = false;
+        Ok(())
+    }
+
     /// Whether a primary-button gesture is extending the native text selection.
     pub fn is_dragging_selection(&self) -> bool {
         self.dragging
