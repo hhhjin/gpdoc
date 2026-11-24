@@ -17,6 +17,12 @@ For changes to editing behavior, add a regression case that shows what the user 
 
 In your pull request, describe the user-visible change and list the checks you ran.
 
+## Choose a target branch
+
+Open editor, plugin, and feature documentation PRs against `next`. Site styling changes can go directly to `main`. Every push to `main` deploys the website, including its documentation and playground.
+
+When the features on `next` are ready, merge `next` into `main` with a merge commit to preserve the individual changes for the changelog. This deploys the site and asks release-plz to open a release PR for changed crates. Review and merge that PR to publish to crates.io. Merge `main` back into `next` to carry over site fixes, released versions, and changelogs.
+
 ## Write commits for release notes
 
 Release-plz generates each crate's `CHANGELOG.md` in the release PR from the commits that land on `main`. You can skip changelog edits in a feature or bug-fix PR.

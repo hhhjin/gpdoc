@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [closed]
 
 permissions: {}
 
@@ -15,8 +17,6 @@ jobs:
       contents: write
       pull-requests: read
       id-token: write
-    outputs:
-      releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
       - &checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -42,8 +42,7 @@ jobs:
               exit 1
             fi
           done < "$RUNNER_TEMP/licenses.tsv"
-      - id: release
-        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5
+      - uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5
         with:
           command: release
           config: .github/release-publish.toml
@@ -51,7 +50,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-pr:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.RELEASE_PLZ_ENABLED == 'true'
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'next' &&
+      vars.RELEASE_PLZ_ENABLED == 'true'
     # The published gpdoc 0.1.0 baseline predates the Linux libc pin for xattr.
     # TODO: Restore ubuntu-latest and remove the Metal setup once a gpdoc release
     # with the libc 0.2.189 pin is on crates.io and serves as the semver baseline.
@@ -72,35 +76,3 @@ jobs:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  web-changes:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      changed: ${{ steps.diff.outputs.changed }}
-    steps:
-      - *checkout
-      - id: diff
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: |
-          if [[ "$BEFORE" =~ ^0+$ ]]; then
-            BEFORE=$(git hash-object -w -t tree /dev/null)
-          fi
-          files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- web/)
-          if [[ -n "$files" ]]; then
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-          fi
-
-  deploy-web:
-    needs: [web-changes, publish]
-    if: >-
-      !cancelled() &&
-      (needs.web-changes.outputs.changed == 'true' || needs.publish.outputs.releases_created == 'true')
-    permissions:
-      contents: read
-    uses: ./.github/workflows/deploy-web.yml
-    secrets:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
