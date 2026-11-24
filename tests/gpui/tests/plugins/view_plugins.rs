@@ -307,30 +307,30 @@ fn decorations_menus_and_drop_handlers() {
     });
 }
 
-#[path = "../../../../crates/gpdoc/examples/editor/completion.rs"]
-mod completion;
-#[path = "../../../../crates/gpdoc/examples/editor/completion_views.rs"]
-mod completion_views;
-#[path = "../../../../crates/gpdoc/examples/editor/menu_icons.rs"]
-#[expect(
-    dead_code,
-    reason = "the test app uses the SVG elements without the demo asset catalog"
-)]
-mod menu_icons;
+fn mention_picker() -> Plugin {
+    use gpdoc_plugin_mention::{Mention, MentionCatalog, mention};
 
-fn mention_picker() -> gpdoc::EditorPlugin {
-    gpdoc_plugin_mention::mention().with_view(completion_views::mention_menu)
+    mention().with_metadata(MentionCatalog::new([
+        Mention::new("ada", "Ada"),
+        Mention::new("lin", "Lin"),
+        Mention::new("sam", "Sam"),
+    ]))
 }
 
 #[test]
 fn slash_menu_creates_a_task_and_preserves_literal_slashes() {
-    use gpdoc_plugin_slash_command::slash_commands;
+    use gpdoc_plugin_slash_command::{SlashCommand, slash_commands};
 
     let config = EditorConfig::builder()
         .plugin(paragraph())
         .plugin(gpdoc_plugin_task_list::task_item())
         .plugin(gpdoc_plugin_task_list::task_list())
-        .plugin(slash_commands(completion::commands()).with_view(completion_views::slash_menu))
+        .plugin(slash_commands([SlashCommand {
+            id: "task-list",
+            label: "To-do list",
+            aliases: &["todo"],
+            command: gpdoc::StoredCommand::new(gpdoc_plugin_task_list::Toggle),
+        }]))
         .build()
         .unwrap();
     let mut app = TestAppContext::single();

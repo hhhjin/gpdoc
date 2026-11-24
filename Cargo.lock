@@ -2418,6 +2418,7 @@ name = "gpdoc-editor-demo"
 version = "0.1.0"
 dependencies = [
  "gpdoc",
+ "gpdoc-core",
  "gpdoc-demo-fonts",
  "gpdoc-plugin-audio",
  "gpdoc-plugin-blockquote",
@@ -2464,13 +2465,10 @@ dependencies = [
  "gpdoc",
  "gpdoc-core",
  "gpdoc-plugin",
- "gpdoc-plugin-audio",
  "gpdoc-plugin-blockquote",
  "gpdoc-plugin-bold",
  "gpdoc-plugin-box-selection",
  "gpdoc-plugin-bubble-menu",
- "gpdoc-plugin-bullet-list",
- "gpdoc-plugin-code-block",
  "gpdoc-plugin-collaboration",
  "gpdoc-plugin-collaboration-caret",
  "gpdoc-plugin-details",
@@ -2487,10 +2485,8 @@ dependencies = [
  "gpdoc-plugin-image",
  "gpdoc-plugin-invisible-characters",
  "gpdoc-plugin-italic",
- "gpdoc-plugin-mathematics",
  "gpdoc-plugin-mention",
  "gpdoc-plugin-node-range",
- "gpdoc-plugin-ordered-list",
  "gpdoc-plugin-paragraph",
  "gpdoc-plugin-placeholder",
  "gpdoc-plugin-ruby-text",
@@ -2500,7 +2496,6 @@ dependencies = [
  "gpdoc-plugin-text-align",
  "gpdoc-plugin-text-style",
  "gpui",
- "gpui-icons",
 ]
 
 [[package]]
@@ -2556,6 +2551,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "gpdoc",
+ "gpdoc-core",
  "gpdoc-demo-fonts",
  "gpdoc-plugin-audio",
  "gpdoc-plugin-blockquote",

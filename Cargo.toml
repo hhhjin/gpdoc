@@ -2,8 +2,8 @@
 resolver = "3"
 members = [
     "crates/*",
-    "crates/gpdoc/examples/editor",
-    "crates/gpdoc/examples/editor/fonts",
+    "examples/editor",
+    "examples/editor/fonts",
     "plugins/*",
     "tests/plugins",
     "tests/gpui",
@@ -19,7 +19,7 @@ homepage = "https://gpdoc.dev"
 repository = "https://github.com/hhhjin/gpdoc"
 
 [workspace.dependencies]
-gpdoc-demo-fonts = { path = "crates/gpdoc/examples/editor/fonts" }
+gpdoc-demo-fonts = { path = "examples/editor/fonts" }
 gpui-icons = "0.7"
 gpui = { version = "=0.2.2", default-features = false }
 gpui-browser = { package = "gpui-unofficial", version = "=1.29.1", default-features = false }

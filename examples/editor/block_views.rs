@@ -1,16 +1,44 @@
 use gpdoc::ViewPlugin;
 use gpui::{FontWeight, div, prelude::*, px, rgb};
 
+pub const MONOSPACE: &str = if cfg!(target_os = "macos") {
+    "Menlo"
+} else {
+    "monospace"
+};
+
 pub fn block_spacing() -> ViewPlugin {
     ViewPlugin::named("blockSpacing").wrap_blocks(|slot, body, _, _| {
-        let top = match slot.node.kind.as_str() {
-            _ if slot.before.0 == 0 => 0.,
-            "heading" => 22.,
-            "table" | "image" | "audio" | "blockMath" | "codeBlock" => 10.,
-            "horizontalRule" => 12.,
-            _ => 4.,
+        let kind = slot.node.kind.as_str();
+        let (top, bottom) = match kind {
+            "heading" => (16.5, 3.),
+            "paragraph" => (13.5, 3.),
+            "blockquote" => (14., 16.),
+            "bulletList" | "orderedList" => (7.5, 16.),
+            "taskList" => (10.5, 16.5),
+            "table" => (22., 3.),
+            "horizontalRule" => (2., 3.),
+            _ => (10., 3.),
         };
-        div().pt(px(top)).pb(px(3.)).child(body)
+        let block = div()
+            .pb(px(bottom))
+            .when(slot.before.0 != 0, |el| el.pt(px(top)));
+        match kind {
+            "horizontalRule" => block.opacity(0.26).child(body),
+            "orderedList" | "bulletList" => block.ml(-px(2.)).child(body),
+            "table" => block.pl(px(6.)).child(body),
+            "image" => {
+                let width = slot.node.attrs.get("width").and_then(|v| v.as_u64());
+                block.child(
+                    div()
+                        .mx_auto()
+                        .w_full()
+                        .when_some(width, |el, w| el.max_w(px(w as f32)))
+                        .child(body),
+                )
+            }
+            _ => block.child(body),
+        }
     })
 }
 
@@ -37,21 +65,14 @@ pub fn heading() -> ViewPlugin {
             .get("level")
             .and_then(|value| value.as_u64());
         let size = match level {
-            Some(1) => 40.,
-            Some(2) => 28.,
-            Some(3) => 22.,
-            Some(4) => 18.,
-            Some(5) => 16.,
-            _ => 15.,
+            Some(1) => 30.,
+            Some(2) => 24.,
+            _ => 20.,
         };
         div()
             .text_size(px(size))
             .line_height(px(size * 1.25))
-            .font_weight(if level == Some(1) {
-                FontWeight::BOLD
-            } else {
-                FontWeight::SEMIBOLD
-            })
+            .font_weight(FontWeight::SEMIBOLD)
             .child(block.content)
     })
 }
@@ -59,9 +80,10 @@ pub fn heading() -> ViewPlugin {
 pub fn quote() -> ViewPlugin {
     gpdoc_plugin_blockquote::quote_block(|block, _, _| {
         div()
-            .pl(px(12.))
-            .border_l_2()
-            .border_color(rgb(0x37352f))
+            .pl(px(22.))
+            .pr(px(24.))
+            .border_l(px(3.))
+            .border_color(rgb(0x2c2c2c))
             .child(block.content)
     })
 }
@@ -69,12 +91,13 @@ pub fn quote() -> ViewPlugin {
 pub fn code() -> ViewPlugin {
     gpdoc_plugin_code_block::code_block_body(|block, _, _| {
         div()
-            .px(px(18.))
-            .py(px(14.))
-            .rounded_sm()
-            .bg(rgb(0xf7f6f3))
+            .px(px(24.))
+            .py(px(36.))
+            .rounded(px(8.))
+            .bg(rgb(0xf9f8f6))
             .text_size(px(14.))
-            .font_family("monospace")
+            .line_height(px(20.))
+            .font_family(MONOSPACE)
             .child(block.content)
     })
 }
@@ -84,9 +107,15 @@ pub fn list_item() -> ViewPlugin {
         div()
             .flex()
             .items_start()
-            .gap(px(8.))
-            .child(div().flex_none().child(row.marker))
+            .child(
+                div()
+                    .min_w(px(32.))
+                    .flex_none()
+                    .pl(px(9.))
+                    .child(row.marker),
+            )
             .child(div().flex_1().min_w_0().child(row.content))
+            .pt(px(6.))
     })
 }
 
@@ -96,7 +125,7 @@ pub fn tasks() -> ViewPlugin {
             .size(px(16.))
             .rounded(px(2.))
             .border_2()
-            .border_color(rgb(0x37352f))
+            .border_color(rgb(0x2c2c2c))
             .when(task.checked, |el| {
                 el.flex()
                     .items_center()
@@ -113,7 +142,7 @@ pub fn tasks() -> ViewPlugin {
             .checkbox
             .flex_none()
             .w(px(24.))
-            .h(px(26.))
+            .h(px(24.))
             .flex()
             .items_center()
             .justify_center()
@@ -123,7 +152,8 @@ pub fn tasks() -> ViewPlugin {
         div()
             .flex()
             .items_start()
-            .gap(px(4.))
+            .py(px(3.))
+            .gap(px(6.))
             .child(checkbox)
             .child(
                 div()
@@ -150,7 +180,16 @@ pub fn table_cell(
     if cell.selected {
         cell = cell.layer(div().bg(gpui::rgba(0x337ea933)));
     }
-    cell.content(div().p(px(4.)))
+    let header = cell.is_header();
+    cell.content(
+        div()
+            .pl(px(10.))
+            .pr(px(8.))
+            .py(px(6.))
+            .text_size(px(14.))
+            .line_height(px(23.))
+            .when(header, |el| el.font_weight(FontWeight::SEMIBOLD)),
+    )
 }
 
 pub fn audio() -> ViewPlugin {
@@ -158,8 +197,11 @@ pub fn audio() -> ViewPlugin {
         let button = clip
             .play_button(cx)
             .size_full()
-            .bg(rgb(0xf7f6f3))
-            .rounded_sm();
+            .bg(rgb(0xf1f2f3))
+            .rounded_full()
+            .text_size(px(14.))
+            .text_center()
+            .whitespace_nowrap();
         if clip.source() == Some("/examples/chime.wav") {
             button
                 .cursor_pointer()
@@ -169,7 +211,7 @@ pub fn audio() -> ViewPlugin {
                     #[cfg(not(target_family = "wasm"))]
                     cx.open_with_system(std::path::Path::new(concat!(
                         env!("CARGO_MANIFEST_DIR"),
-                        "/../../../../web/public/examples/chime.wav"
+                        "/../../web/public/examples/chime.wav"
                     )));
                     cx.stop_propagation();
                 })
@@ -185,15 +227,19 @@ pub fn details() -> ViewPlugin {
         div()
             .flex()
             .items_start()
-            .gap(px(6.))
+            .gap(px(8.))
             .child(
                 header
                     .trigger
                     .flex_none()
-                    .w(px(16.))
+                    .w(px(24.))
+                    .text_center()
                     .text_size(px(12.))
-                    .child(if header.open { "−" } else { "+" }),
+                    .child(if header.open { "▾" } else { "▸" }),
             )
             .child(div().flex_1().min_w_0().child(header.content))
+    })
+    .wrap_node("detailsContent", |_, content, _, _| {
+        div().pl(px(32.)).child(content)
     })
 }

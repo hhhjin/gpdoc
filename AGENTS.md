@@ -4,7 +4,7 @@ gpdoc is a headless rich-text editor framework for Rust with GPUI support.
 
 # Repository layout
 
-- `crates/gpdoc/examples/editor/` contains the runnable GPUI editor demo.
+- `examples/editor/` contains the runnable GPUI editor demo.
 - `crates/` contains the core editing engine, shared editing support, and the GPUI editor library.
 - `plugins/` contains Rust crates for individual editor features such as tables, mentions, and Markdown.
 - `web/` contains the Astro documentation site and the browser playground.

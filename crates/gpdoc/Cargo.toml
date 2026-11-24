@@ -5,7 +5,6 @@ edition.workspace = true
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
-autoexamples = false
 license.workspace = true
 readme.workspace = true
 description = "A rich-text editor framework for GPUI"

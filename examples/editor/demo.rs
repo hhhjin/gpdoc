@@ -32,20 +32,26 @@ impl gpui::Render for DocumentSurface {
         use gpui::{div, prelude::*, px, rgb};
         gpdoc::EditorSurface::new(&self.0)
             .size_full()
-            .font_family(gpdoc_demo_fonts::FAMILY)
+            .font_family(if cfg!(target_os = "macos") {
+                ".SystemUIFont"
+            } else {
+                gpdoc_demo_fonts::FAMILY
+            })
             .bg(rgb(0xffffff))
-            .text_color(rgb(0x37352f))
+            .text_color(rgb(0x2c2c2c))
             .text_size(px(16.))
-            .line_height(px(26.))
+            .line_height(px(24.))
             .layout(|document| {
                 div()
                     .w_full()
                     .flex()
                     .justify_center()
-                    .px(px(24.))
+                    // The block handle occupies the other 20 px of the left margin.
+                    .pl(px(4.))
+                    .pr(px(24.))
                     .pt(px(44.))
                     .pb(px(96.))
-                    .child(document.max_w(px(728.)))
+                    .child(document.max_w(px(724.)))
             })
     }
 }
@@ -89,7 +95,6 @@ fn editor_config() -> gpdoc::EditorConfig {
             gpdoc_plugin_italic::italic(),
             gpdoc_plugin_underline::underline(),
             gpdoc_plugin_strike::strike(),
-            gpdoc_plugin_inline_code::inline_code(),
             gpdoc_plugin_hard_break::hard_break(),
             gpdoc_plugin_bullet_list::bullet_list(),
             gpdoc_plugin_ordered_list::ordered_list(),
@@ -99,8 +104,20 @@ fn editor_config() -> gpdoc::EditorConfig {
             gpdoc_plugin_superscript::superscript(),
             gpdoc_plugin_task_list::task_list(),
             gpdoc_plugin_image::image(),
-            gpdoc_plugin_mathematics::mathematics(),
         ])
+        .plugin(gpdoc_plugin_mathematics::mathematics().with_view(|| {
+            gpdoc_plugin_mathematics::formula_content().node_format("blockMath", |_, format| {
+                format.alignment = gpdoc_core::TextAlignment::Center;
+            })
+        }))
+        .plugin(gpdoc_plugin_inline_code::inline_code().with_view(|| {
+            gpdoc::ViewPlugin::named("inlineCode").mark_format("code", |_, style| {
+                style.font_family = Some(block_views::MONOSPACE.into());
+                style.font_size = Some(gpdoc_core::TextLength::Em(0.875));
+                style.color = Some([199, 63, 58, 255]);
+                style.background = Some([245, 244, 242, 255]);
+            })
+        }))
         .plugin(gpdoc_plugin_task_list::task_item().with_view(block_views::tasks))
         .plugin(
             gpdoc_plugin_details::details_with_persistence(true).with_view(block_views::details),
@@ -124,7 +141,7 @@ fn editor_config() -> gpdoc::EditorConfig {
         .plugin(gpdoc_plugin_list_item::list_item().with_view(block_views::list_item))
         .plugin(
             gpdoc_plugin_highlight::highlight()
-                .with_view(|| gpdoc_plugin_highlight::highlight_format([255, 224, 138])),
+                .with_view(|| gpdoc_plugin_highlight::highlight_format([250, 243, 227])),
         )
         .plugin(placeholder("Write a note, or type / for blocks…"))
         .plugin(gpdoc_plugin_box_selection::box_selection())
@@ -132,14 +149,14 @@ fn editor_config() -> gpdoc::EditorConfig {
         .plugin(gpdoc_plugin_gap_cursor::gap_cursor())
         .plugin(
             gpdoc_plugin_drop_cursor::drop_cursor().with_view(|bounds, window, _| {
-                window.paint_quad(gpui::fill(bounds, gpui::rgb(0x37352f)))
+                window.paint_quad(gpui::fill(bounds, gpui::rgb(0x2c2c2c)))
             }),
         )
         .plugin(mention().with_view(completion_views::mention_menu))
         .plugin(slash_commands(completion::commands()).with_view(completion_views::slash_menu))
         .plugin(format_menu::format_menu())
-        .plugin(block_views::drag_handle())
         .plugin(block_views::block_spacing())
+        .plugin(block_views::drag_handle())
         .build()
         .expect("configure demo editor")
 }

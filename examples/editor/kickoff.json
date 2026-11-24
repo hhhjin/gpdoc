@@ -78,14 +78,17 @@
           "content": [
             {
               "type": "tableHeader",
+              "attrs": {"colwidth": [160]},
               "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Session"}]}]
             },
             {
               "type": "tableHeader",
+              "attrs": {"colwidth": [120]},
               "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Owner"}]}]
             },
             {
               "type": "tableHeader",
+              "attrs": {"colwidth": [144]},
               "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Deliverable"}]}]
             }
           ]
@@ -149,8 +152,8 @@
       "attrs": {
         "src": "session-plan.png",
         "alt": "A 15-minute session: 3 minutes for the brief, 8 for writing, and 4 for the debrief.",
-        "width": 560,
-        "height": 82
+        "width": 544,
+        "height": 80
       }
     },
     {

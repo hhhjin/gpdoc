@@ -15,15 +15,9 @@ gpdoc = { workspace = true, default-features = true }
 gpdoc-core.workspace = true
 gpdoc-plugin.workspace = true
 gpui = { version = "=0.2.2", default-features = false }
-gpui-icons.workspace = true
-gpdoc-plugin-audio = { workspace = true, default-features = true }
-gpdoc-plugin-mathematics = { workspace = true, default-features = true }
-gpdoc-plugin-ordered-list = { workspace = true, default-features = true }
 gpdoc-plugin-blockquote = { workspace = true, default-features = true }
 gpdoc-plugin-bold = { workspace = true, default-features = true }
 gpdoc-plugin-bubble-menu.workspace = true
-gpdoc-plugin-bullet-list = { workspace = true, default-features = true }
-gpdoc-plugin-code-block = { workspace = true, default-features = true }
 gpdoc-plugin-collaboration = { workspace = true, default-features = true }
 gpdoc-plugin-collaboration-caret = { workspace = true, default-features = true }
 gpdoc-plugin-details = { workspace = true, default-features = true }

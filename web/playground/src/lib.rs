@@ -6,7 +6,7 @@ mod paragraph;
 mod plugins;
 mod view_examples;
 
-#[path = "../../../crates/gpdoc/examples/editor/demo.rs"]
+#[path = "../../../examples/editor/demo.rs"]
 mod demo;
 
 fn application() -> gpui::Application {

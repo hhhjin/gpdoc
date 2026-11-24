@@ -12,6 +12,7 @@ name = "gpdoc-editor-demo"
 path = "main.rs"
 
 [dependencies]
+gpdoc-core.workspace = true
 gpdoc-demo-fonts.workspace = true
 gpui-icons.workspace = true
 gpdoc = { workspace = true, default-features = true }
