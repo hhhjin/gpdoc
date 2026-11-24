@@ -25,7 +25,7 @@ fn main() {
                     Ok(None)
                 }
             });
-            p.shortcut("enter", HighlightSelection);
+            p.shortcut(gpdoc_plugin::key!("enter"), HighlightSelection);
         })
     }
 

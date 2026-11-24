@@ -19,13 +19,11 @@ fn list(items: Vec<Node>) -> Node {
 fn editor(blocks: Vec<Node>) -> Editor {
     gpdoc_plugin::core::Editor::from_document(
         &gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([
-                paragraph_plugin(),
-                heading(),
-                bold(),
-                list_item(),
-                bullet_list(),
-            ])
+            .plugin(paragraph_plugin())
+            .plugin(heading())
+            .plugin(bold())
+            .plugin(list_item())
+            .plugin(bullet_list())
             .build()
             .unwrap(),
         blocks,
@@ -129,7 +127,8 @@ fn indent_appends_to_existing_sublist_and_lifting_keeps_following_siblings() {
 #[test]
 fn installing_individual_features_limits_schema_and_commands() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([bold(), paragraph_plugin()])
+        .plugin(bold())
+        .plugin(paragraph_plugin())
         .build()
         .unwrap();
     assert!(
@@ -224,11 +223,14 @@ fn custom_list_containers_use_the_registered_list_item() {
     }
 
     assert!(matches!(
-        gpdoc_plugin::core::EditorConfig::builder().plugins([paragraph_plugin(), outline()]).build(),
+        gpdoc_plugin::core::EditorConfig::builder().plugin(paragraph_plugin())
+        .plugin(outline()).build(),
         Err(Error::InvalidSchema(message)) if message.contains("listItem")
     ));
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph_plugin(), list_item(), outline()])
+        .plugin(paragraph_plugin())
+        .plugin(list_item())
+        .plugin(outline())
         .build()
         .unwrap();
     let outline = Node::container("outline", vec![item("first"), item("second")]);

@@ -85,7 +85,7 @@ For Backspace and Delete at item boundaries, add [List keyboard shortcuts](/docs
 
 ## Custom list plugins
 
-`list_container(p: &mut PluginSpec, kind: &'static str, attrs: AttrSpecs)` registers a container that accepts one or more list items. To wrap selected paragraphs, register your own command and call `wrap_list` in its handler.
+`list_container<S>(p: &mut PluginSpec<S>, kind: &'static str, attrs: AttrSpecs)` registers a container that accepts one or more list items. To wrap selected paragraphs, register your own command and call `wrap_list` in its handler.
 
 ### Command helpers
 

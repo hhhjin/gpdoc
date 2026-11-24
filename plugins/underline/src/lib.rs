@@ -1,20 +1,20 @@
-use gpdoc_plugin::marks::FormattingMark;
+use gpdoc_plugin::marks::register_formatting_mark;
 use gpdoc_plugin::prelude::*;
 
 unit_command!(pub Set, "setUnderline");
 unit_command!(pub Unset, "unsetUnderline");
 unit_command!(pub Toggle, "toggleUnderline");
 
-pub fn underline() -> Plugin {
-    let plugin: Plugin = FormattingMark {
-        name: "underline",
-        set: Set,
-        unset: Unset,
-        toggle: Toggle,
-        shortcut: Some("Mod-u"),
-        delimiters: &[],
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        toggle: Toggle => ["Mod-u"],
     }
-    .into();
+}
+
+pub fn underline() -> Plugin<Shortcuts> {
+    let plugin = Plugin::<Shortcuts>::new("underline", |p| {
+        register_formatting_mark::<Set, Unset, Toggle>(p, "underline");
+    });
     #[cfg(feature = "gpui")]
     let plugin = gpdoc::PluginViewExt::gpui_default_view(plugin, underline_format);
     plugin

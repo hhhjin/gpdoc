@@ -1,12 +1,19 @@
 use gpdoc_plugin::prelude::*;
-pub fn trailing_node() -> Plugin {
+
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        hooks Hooks { append_trailing_node: append }
+    }
+}
+
+pub fn trailing_node() -> Plugin<Config> {
     trailing_node_with(None, Vec::new())
 }
 
 /// Append the configured node after edits that leave a different last block.
-pub fn trailing_node_with(node: Option<String>, not_after: Vec<String>) -> Plugin {
-    Plugin::new("trailingNode", |p| {
-        p.append_edits(move |change| {
+pub fn trailing_node_with(node: Option<String>, not_after: Vec<String>) -> Plugin<Config> {
+    Plugin::<Config>::new("trailingNode", |p| {
+        p.hooks().append_trailing_node().set(move |change| {
             if change.before.is_none() {
                 return Ok(vec![]);
             }
@@ -47,7 +54,9 @@ mod tests {
     #[test]
     fn appended_block_shares_the_triggering_commands_history() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), heading(), trailing_node()])
+            .plugin(paragraph())
+            .plugin(heading())
+            .plugin(trailing_node())
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

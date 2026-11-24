@@ -3,7 +3,13 @@ use gpdoc_plugin::textblock::set_node;
 
 unit_command!(pub Set, "setParagraph");
 
-pub fn paragraph() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        set: Set => ["Mod-Alt-0"],
+    }
+}
+
+pub fn paragraph() -> Plugin<Shortcuts> {
     Plugin::new("paragraph", |p| {
         p.node(
             NodeSpec::block("paragraph")
@@ -12,7 +18,6 @@ pub fn paragraph() -> Plugin {
         );
         p.default_text_block("paragraph");
         p.command::<Set>(|ctx, _| set_node("paragraph", Attrs::new())(ctx, Attrs::new()));
-        p.shortcut("Mod-Alt-0", Set);
     })
     .priority(1000)
 }

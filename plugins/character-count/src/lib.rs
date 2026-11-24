@@ -8,6 +8,12 @@ pub enum CountMode {
     NodeSize,
 }
 
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        hooks Hooks { limit: filter, trim: append }
+    }
+}
+
 pub fn characters(document: &Document, mode: CountMode) -> usize {
     CountOptions {
         mode,
@@ -56,19 +62,19 @@ fn plain_text(node: &Node, separator: &str) -> String {
     node.text_between(0, node.content.size(), separator, " ")
         .expect("validated document range")
 }
-pub fn character_count(options: CountOptions) -> Plugin {
-    Plugin::new("characterCount", |p| {
+pub fn character_count(options: CountOptions) -> Plugin<Config> {
+    Plugin::<Config>::new("characterCount", |p| {
         let Some(limit) = options.limit.filter(|n| *n != 0) else {
             return;
         };
-        p.filter_transaction(move |change| {
+        p.hooks().limit().set(move |change| {
             let size = options.characters(change.document.root());
             Ok(size <= limit
                 || change
                     .before
                     .is_some_and(|old| size <= options.characters(old.root())))
         });
-        p.append_edits(move |change| {
+        p.hooks().trim().set(move |change| {
             let root = change.document.root();
             let count = options.characters(change.document.root());
             if count <= limit {
@@ -149,13 +155,11 @@ mod tests {
     #[test]
     fn counts_blocks_and_surrogate_pairs_and_limits_edits() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                character_count(CountOptions {
-                    limit: Some(7),
-                    ..Default::default()
-                }),
-            ])
+            .plugin(paragraph())
+            .plugin(character_count(CountOptions {
+                limit: Some(7),
+                ..Default::default()
+            }))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

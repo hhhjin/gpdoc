@@ -337,7 +337,8 @@ mod tests {
     #[test]
     fn continued_blocks_map_utf16_offsets_and_replace_across_paragraphs() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), find_and_replace_with(|_| true)])
+            .plugin(paragraph())
+            .plugin(find_and_replace_with(|_| true))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(
@@ -364,7 +365,8 @@ mod tests {
     #[test]
     fn searching_and_clearing_preserve_document_and_edit_history() -> Result<(), Error> {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), find_and_replace()])
+            .plugin(paragraph())
+            .plugin(find_and_replace())
             .build()?;
         let mut editor = gpdoc_plugin::core::Editor::from_document(
             &config,
@@ -393,7 +395,8 @@ mod tests {
     #[test]
     fn search_state_is_per_editor_and_transactional() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), find_and_replace()])
+            .plugin(paragraph())
+            .plugin(find_and_replace())
             .build()
             .unwrap();
         let mut left = gpdoc_plugin::core::Editor::from_document(

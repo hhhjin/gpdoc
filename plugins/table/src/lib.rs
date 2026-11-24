@@ -60,7 +60,15 @@ impl Command for ResizeColumn {
     const NAME: &'static str = "setTableColumnWidth";
 }
 
-pub fn table() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        previous_cell: PreviousCell => ["Shift-Tab"],
+        advance_cell: Tab => ["Tab"],
+        delete_selected: DeleteSelected => ["Backspace", "Mod-Backspace", "Delete", "Mod-Delete"],
+    }
+}
+
+pub fn table() -> Plugin<Shortcuts> {
     let plugin = Plugin::new("table", |p| {
         p.node(NodeSpec::block("table").group("block").content("tableRow+"));
         p.drag_handle_for_subtree("table");
@@ -111,9 +119,6 @@ pub fn table() -> Plugin {
             }
             delete_table(ctx)
         });
-        for key in ["Backspace", "Mod-Backspace", "Delete", "Mod-Delete"] {
-            p.shortcut(key, DeleteSelected);
-        }
         p.command::<SetSelection>(set_cell_selection);
         p.command::<SetCellAttribute>(|ctx, arg| {
             Grid::command(ctx, Operation::SetAttribute(&arg.name, &arg.value))
@@ -133,7 +138,6 @@ pub fn table() -> Plugin {
         p.command::<MergeOrSplit>(|ctx, _| Grid::command(ctx, Operation::MergeOrSplit));
         p.command::<MergeCells>(|ctx, _| Grid::command(ctx, Operation::Merge));
         p.command::<PreviousCell>(|ctx, _| Grid::command(ctx, Operation::Move(false)));
-        p.shortcut("Shift-Tab", PreviousCell);
         p.command::<Tab>(|ctx, _| {
             if let Some(tx) = Grid::command(ctx, Operation::Move(true))? {
                 return Ok(Some(tx));
@@ -143,7 +147,6 @@ pub fn table() -> Plugin {
                 StoredCommand::new(GoToNextCell),
             ])
         });
-        p.shortcut("Tab", Tab);
     });
     #[cfg(feature = "gpui")]
     let plugin = gpdoc::PluginViewExt::gpui_default_view(plugin, view::plain_grid);

@@ -194,10 +194,8 @@ fn edits_and_carets_follow_the_shared_session() {
         view.update(cx, |v, cx| {
             v.replace_and_mark_text_in_range(Some(0..0), "ㅎ", Some(1..1), window, cx);
             let other_config = gpdoc_core::EditorConfig::builder()
-                .plugins([
-                    gpdoc_plugin_paragraph::paragraph(),
-                    gpdoc_plugin_bold::bold(),
-                ])
+                .plugin(gpdoc_plugin_paragraph::paragraph())
+                .plugin(gpdoc_plugin_bold::bold())
                 .build()
                 .unwrap();
             let other =

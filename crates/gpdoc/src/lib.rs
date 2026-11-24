@@ -2,6 +2,7 @@
 #[cfg(all(feature = "gpui", target_family = "wasm"))]
 extern crate gpui_browser as gpui;
 
+pub use gpdoc_core::key;
 pub use gpdoc_core::{
     Attrs, Command, CommandOutcome, DocPos, Document, Edit, Editor, Error, JsonError, Mark, Node,
     OpenJsonError, Selection, Shortcut, Step, StoredCommand, SyntaxToken, Value,

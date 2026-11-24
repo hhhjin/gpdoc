@@ -16,6 +16,8 @@ pub struct InputRuleContext<'a> {
     pub schema: &'a Schema,
     pub selection: Selection,
     pub inserted: Range<DocPos>,
+    /// The last character of the committed text input. Paste rules receive `None`.
+    pub last_typed_char: Option<char>,
 }
 #[derive(Clone)]
 pub(crate) struct InputRule {
@@ -308,6 +310,7 @@ impl EditorConfig {
         doc: &Document,
         selection: Selection,
         inserted: Range<DocPos>,
+        last_typed_char: char,
     ) -> Result<Option<(Vec<Edit>, Option<&str>)>, Error> {
         for rule in &self.0.hooks.rules {
             if let Some(steps) = (rule.handler)(InputRuleContext {
@@ -315,6 +318,7 @@ impl EditorConfig {
                 schema: self.schema(),
                 selection,
                 inserted: inserted.clone(),
+                last_typed_char: Some(last_typed_char),
             })? {
                 return Ok(Some((steps, rule.clear_mark.as_deref())));
             }

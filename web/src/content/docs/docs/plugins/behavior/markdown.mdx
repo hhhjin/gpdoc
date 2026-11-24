@@ -100,7 +100,7 @@ Declare the mark name and delimiter with `MarkdownSyntax::mark` to support liter
 use gpdoc_plugin::{core::MarkSpec, Plugin};
 use gpdoc_plugin_markdown::MarkdownSyntax;
 
-let important = Plugin::new("important", |p| {
+let important: Plugin = Plugin::new("important", |p| {
     p.mark(MarkSpec::new("important"));
     p.metadata(MarkdownSyntax::default().mark("important", "=="));
 });

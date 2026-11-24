@@ -10,9 +10,15 @@ pub struct TextInputTransaction {
     revision: u64,
     config: EditorConfig,
     draft: Draft,
-    rule_range: Option<Range<DocPos>>,
+    typed: Option<TypedInput>,
     pasted: Option<Range<DocPos>>,
     typing_marks: Option<Vec<Mark>>,
+}
+
+#[derive(Clone)]
+struct TypedInput {
+    range: Range<DocPos>,
+    last_char: char,
 }
 
 impl Editor {
@@ -22,7 +28,7 @@ impl Editor {
             revision: self.revision,
             config: self.config.clone(),
             draft: Draft::new(&self.state),
-            rule_range: None,
+            typed: None,
             pasted: None,
             typing_marks: None,
         }
@@ -48,10 +54,13 @@ impl Editor {
             return Err(Error::StaleRevision);
         }
         let mut draft = input.draft;
-        if let Some(range) = input.rule_range
-            && let Some((steps, clear_mark)) =
-                self.config
-                    .match_input(&draft.state.doc, draft.state.selection, range)?
+        if let Some(typed) = input.typed
+            && let Some((steps, clear_mark)) = self.config.match_input(
+                &draft.state.doc,
+                draft.state.selection,
+                typed.range,
+                typed.last_char,
+            )?
         {
             for step in steps {
                 draft.step(&step)?;
@@ -96,7 +105,7 @@ impl TextInputTransaction {
         self.config.validate_selection(selection, self.document())?;
         let mut next = self.clone();
         next.draft.state.selection = selection;
-        next.rule_range = None;
+        next.typed = None;
         let state = next.draft.state.clone();
         let owner = Arc::new(());
         let ctx = super::CommandContext::for_draft(&next.config, &state, &owner, next.revision);
@@ -106,13 +115,14 @@ impl TextInputTransaction {
         } else {
             let text = text.replace("\r\n", "\n").replace('\r', "\n");
             range = next.replace(selection, &text.split('\n').collect::<Vec<_>>())?;
-            next.rule_range = None;
+            next.typed = None;
             for rule in next.config.paste_rules() {
                 let steps = rule(crate::InputRuleContext {
                     document: &next.draft.state.doc,
                     selection: next.selection(),
                     schema: next.config.schema(),
                     inserted: range.clone(),
+                    last_typed_char: None,
                 })?;
                 if steps.is_empty() {
                     continue;
@@ -149,7 +159,10 @@ impl TextInputTransaction {
         let mut next = Draft::new(&self.draft.state);
         let typing_marks = match selection {
             Selection::Text { anchor, head }
-                if self.rule_range.as_ref() == Some(&(anchor.min(head)..anchor.max(head))) =>
+                if self
+                    .typed
+                    .as_ref()
+                    .is_some_and(|typed| typed.range == (anchor.min(head)..anchor.max(head))) =>
             {
                 self.typing_marks.clone()
             }
@@ -222,7 +235,14 @@ impl TextInputTransaction {
         let inserted = start..end;
         self.pasted = None;
         self.typing_marks = typing_marks;
-        self.rule_range = (rest.is_empty() && !first.is_empty()).then(|| inserted.clone());
+        self.typed = if rest.is_empty() {
+            first.chars().next_back().map(|last_char| TypedInput {
+                range: inserted.clone(),
+                last_char,
+            })
+        } else {
+            None
+        };
         Ok(inserted)
     }
 }

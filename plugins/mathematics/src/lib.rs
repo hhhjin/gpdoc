@@ -70,30 +70,60 @@ impl Command for DeleteBlock {
     const NAME: &'static str = "deleteBlockMath";
 }
 
-pub fn mathematics() -> Plugin {
-    let plugin = Plugin::new("mathematics", |p| {
+plugin_config! {
+    pub Config {
+        input_rules InputRules { block_formula: input, inline_formula: input }
+    }
+}
+
+plugin_config! {
+    pub InlineConfig { input_rules InlineRules { inline_formula: input } }
+}
+
+plugin_config! {
+    pub BlockConfig { input_rules BlockRules { block_formula: input } }
+}
+
+pub fn mathematics() -> Plugin<Config> {
+    let plugin = Plugin::<Config>::new("mathematics", |p| {
         block_formula(p);
+        p.input_rules()
+            .block_formula()
+            .set(formula_input_rule("blockMath", Placement::Block));
         inline_formula(p);
+        p.input_rules()
+            .inline_formula()
+            .set(formula_input_rule("inlineMath", Placement::Inline));
     });
     #[cfg(feature = "gpui")]
     let plugin = plugin.gpui_default_view(formula_content);
     plugin
 }
 
-pub fn inline_math() -> Plugin {
-    let plugin = Plugin::new("inlineMath", inline_formula);
+pub fn inline_math() -> Plugin<InlineConfig> {
+    let plugin = Plugin::<InlineConfig>::new("inlineMath", |p| {
+        inline_formula(p);
+        p.input_rules()
+            .inline_formula()
+            .set(formula_input_rule("inlineMath", Placement::Inline));
+    });
     #[cfg(feature = "gpui")]
     let plugin = plugin.gpui_default_view(inline_formula_content);
     plugin
 }
-pub fn block_math() -> Plugin {
-    let plugin = Plugin::new("blockMath", block_formula);
+pub fn block_math() -> Plugin<BlockConfig> {
+    let plugin = Plugin::<BlockConfig>::new("blockMath", |p| {
+        block_formula(p);
+        p.input_rules()
+            .block_formula()
+            .set(formula_input_rule("blockMath", Placement::Block));
+    });
     #[cfg(feature = "gpui")]
     let plugin = plugin.gpui_default_view(block_formula_content);
     plugin
 }
 
-fn block_formula(p: &mut PluginSpec) {
+fn block_formula<S>(p: &mut PluginSpec<S>) {
     let kind = "blockMath";
     formula(p, kind, Placement::Block);
     p.command::<InsertBlock>(move |ctx, command| {
@@ -103,7 +133,7 @@ fn block_formula(p: &mut PluginSpec) {
     p.command::<DeleteBlock>(move |ctx, command| delete(ctx, kind, command.pos));
 }
 
-fn inline_formula(p: &mut PluginSpec) {
+fn inline_formula<S>(p: &mut PluginSpec<S>) {
     let kind = "inlineMath";
     formula(p, kind, Placement::Inline);
     p.command::<InsertInline>(move |ctx, command| {
@@ -113,17 +143,12 @@ fn inline_formula(p: &mut PluginSpec) {
     p.command::<DeleteInline>(move |ctx, command| delete(ctx, kind, command.pos));
 }
 
-fn formula(p: &mut PluginSpec, kind: &'static str, placement: Placement) {
+fn formula<S>(p: &mut PluginSpec<S>, kind: &'static str, placement: Placement) {
     let attrs = [(
         "latex".into(),
         AttrSpec::with_default(AttrType::String, Value::String(String::new())),
     )]
     .into();
-    let pattern = Regex::new(match placement {
-        Placement::Block => r"^\$\$\$([^$]+)\$\$\$$",
-        Placement::Inline => r"\$\$([^$\n]+)\$\$$",
-    })
-    .unwrap();
     p.node(atom(kind, placement, attrs));
     p.atom_label(kind, |attrs| {
         attrs
@@ -133,8 +158,18 @@ fn formula(p: &mut PluginSpec, kind: &'static str, placement: Placement) {
             .unwrap_or("formula")
             .into()
     });
+}
 
-    p.input_rule(atom_input_rule(kind, move |text| {
+fn formula_input_rule(
+    kind: &'static str,
+    placement: Placement,
+) -> impl Fn(InputRuleContext<'_>) -> Result<Option<Vec<Edit>>, Error> {
+    let pattern = Regex::new(match placement {
+        Placement::Block => r"^\$\$\$([^$]+)\$\$\$$",
+        Placement::Inline => r"\$\$([^$\n]+)\$\$$",
+    })
+    .unwrap();
+    atom_input_rule(kind, move |text| {
         let capture = pattern.captures(text)?;
         let start = capture.get(0)?.start();
         if text[..start].ends_with('$') {
@@ -144,7 +179,7 @@ fn formula(p: &mut PluginSpec, kind: &'static str, placement: Placement) {
             start,
             [("latex".into(), Value::String(capture[1].into()))].into(),
         ))
-    }));
+    })
 }
 
 fn insert(

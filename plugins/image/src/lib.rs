@@ -52,11 +52,17 @@ fn image_label(attrs: &Attrs) -> String {
         .into()
 }
 
-pub fn image() -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        input_rules InputRules { markdown_image: input }
+    }
+}
+
+pub fn image() -> Plugin<Config> {
     image_with_placement(Placement::Block)
 }
 
-pub fn image_with_placement(placement: Placement) -> Plugin {
+pub fn image_with_placement(placement: Placement) -> Plugin<Config> {
     let attrs = ["src", "alt", "title", "width", "height"].map(|key| {
         let kind = if matches!(key, "width" | "height") {
             AttrType::Json
@@ -66,23 +72,25 @@ pub fn image_with_placement(placement: Placement) -> Plugin {
         (key.into(), AttrSpec::with_default(kind, Value::Null))
     });
     let markdown = Regex::new(r#"(?:^|\s)(!\[(.*)\]\((\S+?)(?:\s+["'](\S+)["'])?\))$"#).unwrap();
-    let plugin = Plugin::new("image", |p| {
+    let plugin = Plugin::<Config>::new("image", |p| {
         p.node(atom("image", placement, AttrSpecs::from(attrs)));
         p.atom_label("image", image_label);
-        p.input_rule(captured_atom_input_rule("image", move |text| {
-            let cap = markdown.captures(text)?;
-            let attrs = [
-                ("alt".into(), Value::String(cap[2].into())),
-                ("src".into(), Value::String(cap[3].into())),
-                (
-                    "title".into(),
-                    cap.get(4)
-                        .map_or(Value::Null, |m| Value::String(m.as_str().into())),
-                ),
-            ]
-            .into();
-            Some((cap.get(1)?.start(), attrs))
-        }));
+        p.input_rules()
+            .markdown_image()
+            .set(captured_atom_input_rule("image", move |text| {
+                let cap = markdown.captures(text)?;
+                let attrs = [
+                    ("alt".into(), Value::String(cap[2].into())),
+                    ("src".into(), Value::String(cap[3].into())),
+                    (
+                        "title".into(),
+                        cap.get(4)
+                            .map_or(Value::Null, |m| Value::String(m.as_str().into())),
+                    ),
+                ]
+                .into();
+                Some((cap.get(1)?.start(), attrs))
+            }));
 
         p.command::<Set>(|ctx, args| {
             insert_atom(

@@ -77,30 +77,37 @@ pub trait PluginViewExt {
     fn gpui_default_view<V: Into<Vec<ViewPlugin>>>(
         self,
         view: impl Fn() -> V + Send + Sync + 'static,
-    ) -> Plugin;
+    ) -> Self;
 
     /// Replace the entire default composition with an application view or collection of views.
     fn with_view<V: Into<Vec<ViewPlugin>>>(self, view: impl FnOnce() -> V) -> EditorPlugin;
 }
 
-impl PluginViewExt for Plugin {
+impl<S> PluginViewExt for Plugin<S>
+where
+    Plugin<S>: Into<Plugin>,
+{
     fn gpui_default_view<V: Into<Vec<ViewPlugin>>>(
         self,
         view: impl Fn() -> V + Send + Sync + 'static,
-    ) -> Plugin {
+    ) -> Self {
         self.with_metadata(DefaultView(Box::new(move || view().into())))
     }
 
     fn with_view<V: Into<Vec<ViewPlugin>>>(self, view: impl FnOnce() -> V) -> EditorPlugin {
         EditorPlugin {
-            document: Some(self),
+            document: Some(self.into()),
             views: view().into(),
         }
     }
 }
 
-impl From<Plugin> for EditorPlugin {
-    fn from(plugin: Plugin) -> Self {
+impl<S> From<Plugin<S>> for EditorPlugin
+where
+    Plugin<S>: Into<Plugin>,
+{
+    fn from(plugin: Plugin<S>) -> Self {
+        let plugin = plugin.into();
         let views = plugin
             .metadata::<DefaultView>()
             .map(|factory| (factory.0)())
@@ -245,7 +252,7 @@ mod tests {
 
     fn blocks() -> EditorConfigBuilder {
         use gpdoc_core::NodeSpec;
-        EditorConfig::builder().plugin(Plugin::new("blocks", |p| {
+        EditorConfig::builder().plugin(Plugin::<()>::new("blocks", |p| {
             p.node(
                 NodeSpec::block("paragraph")
                     .group("block")

@@ -306,7 +306,7 @@ fn chinese_pinyin_candidate_replaces_the_reading_and_unmarks_at_its_new_end() {
 #[test]
 fn projected_labels_edit_and_select_as_whole_atoms() {
     use gpdoc_core::Content;
-    let atoms = Plugin::new("atoms", |p| {
+    let atoms: Plugin = Plugin::new("atoms", |p| {
         p.node(NodeSpec::block("p").group("block").content("inline*"));
         p.node(NodeSpec::inline("mention").group("inline"));
         p.node(NodeSpec::block("media").group("block"));

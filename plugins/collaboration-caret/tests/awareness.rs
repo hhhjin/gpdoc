@@ -6,7 +6,7 @@ use gpdoc_plugin_paragraph::paragraph;
 #[test]
 fn remote_caret_tracks_text_and_disappears_on_disconnect() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph()])
+        .plugin(paragraph())
         .build()
         .unwrap();
     let mut alice = Collaboration::new(

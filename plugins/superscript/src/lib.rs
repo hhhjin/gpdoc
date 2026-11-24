@@ -1,22 +1,22 @@
 #[cfg(feature = "gpui")]
 use gpdoc_plugin::core::Baseline;
-use gpdoc_plugin::marks::FormattingMark;
+use gpdoc_plugin::marks::register_formatting_mark;
 use gpdoc_plugin::prelude::*;
 
 unit_command!(pub Set, "setSuperscript");
 unit_command!(pub Unset, "unsetSuperscript");
 unit_command!(pub Toggle, "toggleSuperscript");
 
-pub fn superscript() -> Plugin {
-    let plugin: Plugin = FormattingMark {
-        name: "superscript",
-        set: Set,
-        unset: Unset,
-        toggle: Toggle,
-        shortcut: Some("Mod-."),
-        delimiters: &[],
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        toggle: Toggle => ["Mod-."],
     }
-    .into();
+}
+
+pub fn superscript() -> Plugin<Shortcuts> {
+    let plugin = Plugin::<Shortcuts>::new("superscript", |p| {
+        register_formatting_mark::<Set, Unset, Toggle>(p, "superscript");
+    });
     #[cfg(feature = "gpui")]
     let plugin = gpdoc::PluginViewExt::gpui_default_view(plugin, superscript_format);
     plugin

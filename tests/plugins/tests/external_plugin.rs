@@ -64,7 +64,8 @@ fn declare_callout(p: &mut PluginSpec) {
 #[test]
 fn command_and_typed_marker_build_the_same_custom_node() {
     let config = EditorConfig::builder()
-        .plugins([paragraph(), callout()])
+        .plugin(paragraph())
+        .plugin(callout())
         .build()
         .unwrap();
     let mut command =
@@ -90,10 +91,7 @@ fn command_and_typed_marker_build_the_same_custom_node() {
     assert_eq!(typing.selection(), old_selection);
 
     let mut plain = gpdoc_plugin::core::Editor::from_document(
-        &EditorConfig::builder()
-            .plugins([paragraph()])
-            .build()
-            .unwrap(),
+        &EditorConfig::builder().plugin(paragraph()).build().unwrap(),
         vec![Node::text("paragraph", "")],
     )
     .unwrap();
@@ -123,7 +121,9 @@ fn rule_plugin(name: &'static str) -> Plugin {
 fn later_plugin_wins_between_equal_priority_input_rules() {
     for (first, second) in [("first", "second"), ("second", "first")] {
         let config = EditorConfig::builder()
-            .plugins([paragraph(), rule_plugin(first), rule_plugin(second)])
+            .plugin(paragraph())
+            .plugin(rule_plugin(first))
+            .plugin(rule_plugin(second))
             .build()
             .unwrap();
         let mut editor =
@@ -147,7 +147,9 @@ fn use_command(name: &'static str) -> Plugin {
 #[test]
 fn duplicate_command_identifies_both_registrations() {
     let result = EditorConfig::builder()
-        .plugins([paragraph(), use_command("left"), use_command("right")])
+        .plugin(paragraph())
+        .plugin(use_command("left"))
+        .plugin(use_command("right"))
         .build();
     assert!(
         matches!(result, Err(Error::Duplicate { name, first, second, .. })
@@ -164,7 +166,8 @@ fn divider() -> Plugin {
 #[test]
 fn deleting_the_only_text_among_dividers_keeps_the_insertion_point_editable() {
     let config = EditorConfig::builder()
-        .plugins([paragraph(), divider()])
+        .plugin(paragraph())
+        .plugin(divider())
         .build()
         .unwrap();
     let divider = Node::leaf("divider", Attrs::new());
@@ -194,7 +197,7 @@ fn writing_tools() -> Vec<Plugin> {
     vec![
         callout(),
         Plugin::new("writing-tools", |p| {
-            p.shortcut("Mod-2", SetHeading(Level::H2));
+            p.shortcut(key!("Mod-2"), SetHeading(Level::H2));
         }),
     ]
 }
@@ -202,7 +205,9 @@ fn writing_tools() -> Vec<Plugin> {
 #[test]
 fn preset_can_bind_a_later_command_without_installing_unrelated_plugins() {
     let config = EditorConfig::builder()
-        .plugins(writing_tools().into_iter().chain([paragraph(), heading()]))
+        .plugins(writing_tools())
+        .plugin(paragraph())
+        .plugin(heading())
         .build()
         .unwrap();
     assert!(config.schema().node_spec("callout").is_some());
@@ -225,7 +230,7 @@ fn preset_can_bind_a_later_command_without_installing_unrelated_plugins() {
 #[test]
 fn missing_shortcut_target_and_duplicate_preset_member_fail_at_build_time() {
     assert!(
-        matches!(EditorConfig::builder().plugins(writing_tools().into_iter().chain([paragraph()])).build(),
+        matches!(EditorConfig::builder().plugins(writing_tools()).plugin(paragraph()).build(),
         Err(Error::InvalidSchema(msg)) if msg.contains("Mod-2") && msg.contains("setHeading"))
     );
     assert!(
@@ -235,18 +240,150 @@ fn missing_shortcut_target_and_duplicate_preset_member_fail_at_build_time() {
 }
 
 #[test]
-fn keymaps_and_input_rules_respect_priority_before_installation_order() {
-    let rebind =
-        Plugin::new("rebind", |p| p.shortcut("Mod-B", SetHeading(Level::H1))).priority(200);
+fn extensions_compose_per_action_and_preserve_command_arguments() {
+    use gpdoc_plugin_hard_break::hard_break;
+
+    let base = heading();
+    let custom = base
+        .clone()
+        .extend(|p| p.shortcuts().toggle(Level::H2).set(key!("F6")))
+        .extend(|p| {
+            let h2 = p.shortcuts().toggle(Level::H2);
+            h2.add("Shift-Mod-.".parse().unwrap());
+            h2.add(key!("Mod-Shift-."));
+            p.shortcuts().toggle(Level::H3).disable();
+        });
     let config = EditorConfig::builder()
-        .plugins([
-            rebind,
-            paragraph(),
-            bold(),
-            heading(),
-            rule_plugin("first").priority(200),
-            rule_plugin("second"),
-        ])
+        .plugin(paragraph())
+        .plugin(custom)
+        .plugin(hard_break().extend(|p| p.shortcuts().insert().remove(key!("Mod-Enter"))))
+        .build()
+        .unwrap();
+
+    for key in [key!("Mod-Alt-2"), key!("Mod-Alt-3"), key!("Mod-Enter")] {
+        assert_eq!(config.shortcuts(&key).count(), 0);
+    }
+    for key in [key!("Mod-Alt-1"), key!("Shift-Enter"), key!("Mod-Shift-.")] {
+        assert_eq!(config.shortcuts(&key).count(), 1);
+    }
+    let mut editor = Editor::from_config(&config).unwrap();
+    let key = key!("F6");
+    editor
+        .run_stored(config.shortcuts(&key).next().unwrap())
+        .unwrap();
+    assert_eq!(editor.document().blocks()[0].attrs["level"], 2);
+    let defaults = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(base)
+        .build()
+        .unwrap();
+    assert_eq!(defaults.shortcuts(&key!("Mod-Alt-2")).count(), 1);
+    assert_eq!(defaults.shortcuts(&key!("F6")).count(), 0);
+}
+
+#[test]
+fn task_item_nesting_configures_the_shortcuts_seen_by_extensions() {
+    use gpdoc_plugin_task_list::{Sink, task_item_with_nesting, task_list};
+
+    for nested in [false, true] {
+        let item = task_item_with_nesting(nested).extend(|p| {
+            let sink = p.shortcuts().sink();
+            assert_eq!(sink.is_some(), nested);
+            if let Some(keys) = sink {
+                keys.set(key!("F6"));
+            }
+        });
+        let config = EditorConfig::builder()
+            .plugin(paragraph())
+            .plugin(task_list())
+            .plugin(item)
+            .build()
+            .unwrap();
+        assert_eq!(config.shortcuts(&key!("Tab")).count(), 0);
+        assert_eq!(
+            config
+                .shortcuts(&key!("F6"))
+                .next()
+                .map(StoredCommand::name),
+            nested.then_some(Sink::NAME)
+        );
+        assert_eq!(config.shortcuts(&key!("Shift-Tab")).count(), 1);
+    }
+}
+
+#[test]
+fn disabling_a_shared_key_keeps_other_plugins_and_rejects_ambiguous_local_actions() {
+    use gpdoc_plugin_table::table;
+
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(table().extend(|p| p.shortcuts().advance_cell().disable()))
+        .plugin(Plugin::<()>::new("app", |p| {
+            p.shortcut(key!("Tab"), gpdoc_plugin_paragraph::Set)
+        }))
+        .build()
+        .unwrap();
+    assert_eq!(
+        config
+            .shortcuts(&key!("Tab"))
+            .map(StoredCommand::name)
+            .collect::<Vec<_>>(),
+        ["setParagraph"]
+    );
+    let result = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(table().extend(|p| p.shortcuts().advance_cell().set(key!("Shift-Tab"))))
+        .build();
+    assert!(
+        matches!(result, Err(Error::InvalidSchema(reason)) if reason.contains("table") && reason.contains("Shift-tab"))
+    );
+}
+
+#[test]
+fn duplicate_direct_shortcuts_fail_at_build_time() {
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(Plugin::<()>::new("app", |p| {
+            p.shortcut(key!("F6"), gpdoc_plugin_paragraph::Set);
+            p.shortcut(key!("f6"), gpdoc_plugin_bold::Toggle);
+        }))
+        .build();
+    assert!(matches!(config, Err(Error::InvalidSchema(reason))
+        if reason.contains("duplicate shortcut 'f6'") && reason.contains("app")));
+}
+
+#[test]
+fn malformed_shortcut_keys_fail_at_build_time() {
+    let key = Shortcut::new("Mod-b");
+    for plugin in [
+        Plugin::<()>::new("app", |p| {
+            p.shortcut(key.clone(), gpdoc_plugin_paragraph::Set)
+        }),
+        bold().extend(|p| p.shortcuts().toggle().set(key)).into(),
+    ] {
+        let config = EditorConfig::builder()
+            .plugin(paragraph())
+            .plugin(plugin)
+            .build();
+        assert!(matches!(config, Err(Error::InvalidSchema(reason))
+            if reason.contains("invalid shortcut 'mod-b'")));
+    }
+}
+
+#[test]
+fn keymaps_and_input_rules_respect_priority_before_installation_order() {
+    let rebind: Plugin = Plugin::new("rebind", |p| {
+        p.shortcut(key!("Mod-B"), SetHeading(Level::H1))
+    })
+    .priority(200);
+    let config = EditorConfig::builder()
+        .plugin(rebind)
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(heading())
+        .plugin(rule_plugin("first").priority(200))
+        .plugin(rule_plugin("second"))
         .build()
         .unwrap();
     let key = Shortcut::primary("b");
@@ -276,7 +413,10 @@ fn article() -> Plugin {
 #[test]
 fn document_expression_controls_open_and_replacing_a_required_root_child() {
     let config = EditorConfig::builder()
-        .plugins([paragraph(), heading(), callout(), article()])
+        .plugin(paragraph())
+        .plugin(heading())
+        .plugin(callout())
+        .plugin(article())
         .build()
         .unwrap();
     let paragraph = Node::text("paragraph", "body");
@@ -306,7 +446,7 @@ fn chains_share_the_pending_selection_and_abort_without_losing_redo() {
     unit_command!(Missing, "missing");
     unit_command!(NeedsRange, "needsRange");
     unit_command!(SelectWord, "selectWord");
-    let select_word = Plugin::new("selectWord", |p| {
+    let select_word: Plugin = Plugin::new("selectWord", |p| {
         p.command::<SelectWord>(|ctx, _| {
             let mut tx = ctx.transaction();
             tx.select(Selection::Text {
@@ -318,20 +458,18 @@ fn chains_share_the_pending_selection_and_abort_without_losing_redo() {
     });
     let mut editor = gpdoc_plugin::core::Editor::from_document(
         &EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                bold(),
-                select_word,
-                Plugin::new("test", |p| {
-                    p.command::<NeedsRange>(|ctx, _| {
-                        if ctx.selection() == Selection::caret(DocPos(1)) {
-                            Ok(None)
-                        } else {
-                            Ok(Some(ctx.transaction()))
-                        }
-                    })
-                }),
-            ])
+            .plugin(paragraph())
+            .plugin(bold())
+            .plugin(select_word)
+            .plugin(Plugin::<()>::new("test", |p| {
+                p.command::<NeedsRange>(|ctx, _| {
+                    if ctx.selection() == Selection::caret(DocPos(1)) {
+                        Ok(None)
+                    } else {
+                        Ok(Some(ctx.transaction()))
+                    }
+                })
+            }))
             .build()
             .unwrap(),
         vec![Node::text("paragraph", "한😀")],
@@ -380,7 +518,7 @@ fn chains_share_the_pending_selection_and_abort_without_losing_redo() {
 #[test]
 fn nested_command_chains_replay_typing_marks_at_the_correct_step() {
     unit_command!(TypeBold, "typeBold");
-    let typing = Plugin::new("typing", |p| {
+    let typing: Plugin = Plugin::new("typing", |p| {
         unit_command!(TypeX, "typeX");
         p.command::<TypeX>(|ctx, _| {
             let Selection::Text { anchor, head } = ctx.selection() else {
@@ -402,7 +540,9 @@ fn nested_command_chains_replay_typing_marks_at_the_correct_step() {
     });
     let mut editor = gpdoc_plugin::core::Editor::from_document(
         &EditorConfig::builder()
-            .plugins([paragraph(), bold(), typing])
+            .plugin(paragraph())
+            .plugin(bold())
+            .plugin(typing)
             .build()
             .unwrap(),
         vec![Node::text("paragraph", "")],
@@ -423,7 +563,8 @@ fn nested_command_chains_replay_typing_marks_at_the_correct_step() {
 fn a_typing_mark_change_invalidates_older_input_without_adding_an_undo_entry() {
     let mut editor = gpdoc_plugin::core::Editor::from_document(
         &EditorConfig::builder()
-            .plugins([paragraph(), bold()])
+            .plugin(paragraph())
+            .plugin(bold())
             .build()
             .unwrap(),
         vec![Node::text("paragraph", "")],
@@ -457,20 +598,23 @@ fn global_attributes_compose_across_independent_plugins() {
         "tags".into(),
         AttrSpec::with_default(AttrType::Json, Value::Null),
     )]);
-    let by_name = Plugin::new("byName", |p| {
+    let by_name: Plugin = Plugin::new("byName", |p| {
         p.attributes(
             AttributeTargets::names(["paragraph", "bold"]),
             attrs.clone(),
         )
     });
-    let by_placement = Plugin::new("byPlacement", |p| {
+    let by_placement: Plugin = Plugin::new("byPlacement", |p| {
         p.attributes(
             AttributeTargets::nodes(|node| node.placement == Placement::Block),
             attrs,
         )
     });
     let config = EditorConfig::builder()
-        .plugins([by_name, paragraph(), bold(), by_placement])
+        .plugin(by_name)
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(by_placement)
         .build()
         .unwrap();
     let mut editor =
@@ -496,7 +640,7 @@ fn global_attributes_compose_across_independent_plugins() {
 #[test]
 fn reject_invalid_or_conflicting_global_defaults_when_building_the_config() {
     let global = |name, kind, default| {
-        Plugin::new(name, |p| {
+        Plugin::<()>::new(name, |p| {
             p.attributes(
                 AttributeTargets::names(["paragraph"]),
                 [("alignment".into(), AttrSpec::with_default(kind, default))].into(),
@@ -505,17 +649,24 @@ fn reject_invalid_or_conflicting_global_defaults_when_building_the_config() {
     };
     assert!(matches!(
         EditorConfig::builder()
-            .plugins([paragraph(), global("first", AttrType::Bool, Value::from(1))])
+            .plugin(paragraph())
+            .plugin(global("first", AttrType::Bool, Value::from(1)))
             .build(),
         Err(Error::InvalidSchema(_))
     ));
     assert!(matches!(
         EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                global("first", AttrType::String, Value::String("left".into())),
-                global("second", AttrType::String, Value::String("center".into())),
-            ])
+            .plugin(paragraph())
+            .plugin(global(
+                "first",
+                AttrType::String,
+                Value::String("left".into())
+            ))
+            .plugin(global(
+                "second",
+                AttrType::String,
+                Value::String("center".into())
+            ))
             .build(),
         Err(Error::InvalidSchema(_))
     ));
@@ -526,7 +677,7 @@ fn a_host_provides_its_own_mark_commands_and_keymap() {
     use gpdoc_plugin::marks::toggle_mark;
 
     unit_command!(ToggleEmphasis, "toggleEmphasis");
-    let custom = Plugin::new("emphasis", |p| {
+    let custom: Plugin = Plugin::new("emphasis", |p| {
         p.mark(MarkSpec::new("emphasis"));
         p.command::<ToggleEmphasis>(|ctx, _| {
             if ctx.selection().bounds(ctx.document()).is_empty() {
@@ -534,10 +685,11 @@ fn a_host_provides_its_own_mark_commands_and_keymap() {
             }
             toggle_mark("emphasis")(ctx, Attrs::new())
         });
-        p.shortcut("F7", ToggleEmphasis);
+        p.shortcut(key!("F7"), ToggleEmphasis);
     });
     let config = EditorConfig::builder()
-        .plugins([paragraph(), custom])
+        .plugin(paragraph())
+        .plugin(custom)
         .build()
         .unwrap();
     let mut editor = gpdoc_plugin::core::Editor::from_document(
@@ -572,7 +724,8 @@ fn independently_configured_plugins_use_their_own_options() {
             ..Default::default()
         };
         let config = EditorConfig::builder()
-            .plugins([paragraph(), link(options)])
+            .plugin(paragraph())
+            .plugin(link(options))
             .build()
             .unwrap();
         assert_eq!(
@@ -585,18 +738,16 @@ fn independently_configured_plugins_use_their_own_options() {
 #[test]
 fn a_third_party_mark_owns_its_markdown_syntax_in_every_entry_point() {
     use gpdoc_plugin_markdown::{MarkdownSyntax, markdown, open, to_markdown};
-    let important = Plugin::new("thirdPartyFormatting", |p| {
+    let important: Plugin = Plugin::new("thirdPartyFormatting", |p| {
         p.mark(MarkSpec::new("important"));
         p.metadata(MarkdownSyntax::default().mark("important", "=="));
     });
     let config = EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            bold(),
-            gpdoc_plugin_inline_code::inline_code(),
-            important,
-            markdown(),
-        ])
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(gpdoc_plugin_inline_code::inline_code())
+        .plugin(important)
+        .plugin(markdown())
         .build()
         .unwrap();
     let source = r"before ==중요 **한** 😀== after \==literal\== and `==code==`";
@@ -655,7 +806,8 @@ fn a_custom_block_can_parse_and_render_its_own_fence() {
         ));
     });
     let config = EditorConfig::builder()
-        .plugins([paragraph(), callout])
+        .plugin(paragraph())
+        .plugin(callout)
         .build()
         .unwrap();
     let imported = open(&config, "```note\n중요\n```").unwrap();
@@ -680,7 +832,7 @@ fn default_text_block_must_support_empty_insertion() {
     let nodes = [paragraph, quote, titled];
 
     for default in ["unknown", "quote", "titled"] {
-        let plugin = Plugin::new("editor", |p| {
+        let plugin: Plugin = Plugin::new("editor", |p| {
             for node in &nodes {
                 p.node(node.clone());
             }
@@ -696,7 +848,8 @@ fn default_text_block_must_support_empty_insertion() {
 #[test]
 fn insert_table_limits_dimensions_before_editing() {
     let config = EditorConfig::builder()
-        .plugins([paragraph(), gpdoc_plugin_table::table()])
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_table::table())
         .build()
         .unwrap();
     let mut editor =
@@ -732,7 +885,7 @@ fn commands_keep_native_arguments_in_shortcuts_and_chains() {
         text: text.into(),
         enabled: true,
     };
-    let insert = Plugin::new("insertion", |p| {
+    let insert: Plugin = Plugin::new("insertion", |p| {
         p.command::<Insert>(|ctx, arg| {
             if !arg.enabled {
                 return Ok(None);
@@ -742,10 +895,11 @@ fn commands_keep_native_arguments_in_shortcuts_and_chains() {
                 text: arg.text,
             })))
         });
-        p.shortcut("F6", enabled("A"));
+        p.shortcut(key!("F6"), enabled("A"));
     });
     let config = EditorConfig::builder()
-        .plugins([paragraph(), insert.clone()])
+        .plugin(paragraph())
+        .plugin(insert.clone())
         .build()
         .unwrap();
     let mut editor = gpdoc_plugin::core::Editor::from_config(&config).unwrap();
@@ -772,21 +926,22 @@ fn commands_keep_native_arguments_in_shortcuts_and_chains() {
 
     unit_command!(Wrong, "insert");
     assert!(matches!(editor.run(Wrong), Err(Error::UnknownCommand(_))));
-    let invalid = Plugin::new("wrong-shortcut", |p| p.shortcut("F5", Wrong));
-    assert!(
-        matches!(EditorConfig::builder().plugins([paragraph(), insert, invalid]).build(), Err(Error::InvalidSchema(reason)) if reason.contains("f5") && reason.contains("insert"))
-    );
+    let invalid: Plugin = Plugin::new("wrong-shortcut", |p| p.shortcut(key!("F5"), Wrong));
+    assert!(matches!(EditorConfig::builder().plugin(paragraph())
+        .plugin(insert)
+        .plugin(invalid).build(), Err(Error::InvalidSchema(reason)) if reason.contains("f5") && reason.contains("insert")));
 }
 
 #[test]
 fn toggling_a_heading_uses_the_kits_default_text_block() {
-    let body = Plugin::new("article-body", |p| {
+    let body: Plugin = Plugin::new("article-body", |p| {
         p.node(NodeSpec::block("body").group("block").content("inline*"));
         p.default_text_block("body");
     });
     let mut editor = gpdoc_plugin::core::Editor::from_config(
         &EditorConfig::builder()
-            .plugins([body, heading()])
+            .plugin(body)
+            .plugin(heading())
             .build()
             .unwrap(),
     )
@@ -796,4 +951,88 @@ fn toggling_a_heading_uses_the_kits_default_text_block() {
     assert_eq!(editor.document().blocks()[0].kind, "heading");
     editor.run(toggle).unwrap();
     assert_eq!(editor.document().blocks()[0].kind, "body");
+}
+
+plugin_config! {
+    HookConfig { hooks TestHooks { review: filter, normalize: append } }
+}
+
+#[test]
+fn replacing_and_reenabling_hooks_preserves_their_position_among_private_hooks() {
+    use std::sync::{Arc, Mutex};
+
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let record = |name| {
+        let events = Arc::clone(&events);
+        move || events.lock().unwrap().push(name)
+    };
+    let plugin = Plugin::<HookConfig>::new("ordered", |p| {
+        let first = record("first append");
+        p.append_edits(move |_| {
+            first();
+            Ok(vec![])
+        });
+        p.hooks().normalize().set(|_| unreachable!());
+        let last = record("last append");
+        p.append_edits(move |_| {
+            last();
+            Ok(vec![])
+        });
+
+        let first = record("first filter");
+        p.filter_transaction(move |_| {
+            first();
+            Ok(true)
+        });
+        p.hooks().review().set(|_| unreachable!());
+        let last = record("last filter");
+        p.filter_transaction(move |_| {
+            last();
+            Ok(true)
+        });
+    })
+    .extend(|p| {
+        p.hooks().normalize().disable();
+        p.hooks().review().disable();
+    });
+    let enabled = plugin.clone().extend(|p| {
+        let append = record("new append");
+        p.hooks().normalize().set(move |_| {
+            append();
+            Ok(vec![])
+        });
+        let filter = record("new filter");
+        p.hooks().review().set(move |_| {
+            filter();
+            Ok(true)
+        });
+    });
+
+    for (plugin, expected) in [
+        (
+            enabled,
+            vec![
+                "first append",
+                "new append",
+                "last append",
+                "first filter",
+                "new filter",
+                "last filter",
+            ],
+        ),
+        (
+            plugin,
+            vec!["first append", "last append", "first filter", "last filter"],
+        ),
+    ] {
+        let config = EditorConfig::builder()
+            .plugin(paragraph())
+            .plugin(plugin)
+            .build()
+            .unwrap();
+        let mut editor = Editor::from_config(&config).unwrap();
+        events.lock().unwrap().clear();
+        editor.insert_text("x").unwrap();
+        assert_eq!(*events.lock().unwrap(), expected);
+    }
 }

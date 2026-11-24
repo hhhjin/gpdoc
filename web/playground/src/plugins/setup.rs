@@ -29,74 +29,86 @@ pub(super) fn open(slug: &str, source: &str) -> Result<Editor> {
     };
     let plugins = match slug {
         "overview" => vec![
-            gpdoc_plugin_bold::bold(),
-            gpdoc_plugin_italic::italic(),
-            gpdoc_plugin_underline::underline(),
-            heading(),
-            gpdoc_plugin_blockquote::blockquote(),
-            list_item(),
-            bullet_list(),
-            gpdoc_plugin_ordered_list::ordered_list(),
+            gpdoc_plugin_bold::bold().into(),
+            gpdoc_plugin_italic::italic().into(),
+            gpdoc_plugin_underline::underline().into(),
+            heading().into(),
+            gpdoc_plugin_blockquote::blockquote().into(),
+            list_item().into(),
+            bullet_list().into(),
+            gpdoc_plugin_ordered_list::ordered_list().into(),
         ],
-        "bold" => vec![gpdoc_plugin_bold::bold()],
-        "italic" => vec![gpdoc_plugin_italic::italic()],
-        "underline" => vec![gpdoc_plugin_underline::underline()],
-        "strike" => vec![gpdoc_plugin_strike::strike()],
-        "inline-code" => vec![gpdoc_plugin_inline_code::inline_code()],
-        "superscript" => vec![gpdoc_plugin_superscript::superscript()],
-        "subscript" => vec![gpdoc_plugin_subscript::subscript()],
-        "link" => vec![gpdoc_plugin_link::link(Default::default())],
+        "bold" => vec![gpdoc_plugin_bold::bold().into()],
+        "italic" => vec![gpdoc_plugin_italic::italic().into()],
+        "underline" => vec![gpdoc_plugin_underline::underline().into()],
+        "strike" => vec![gpdoc_plugin_strike::strike().into()],
+        "inline-code" => vec![gpdoc_plugin_inline_code::inline_code().into()],
+        "superscript" => vec![gpdoc_plugin_superscript::superscript().into()],
+        "subscript" => vec![gpdoc_plugin_subscript::subscript().into()],
+        "link" => vec![gpdoc_plugin_link::link(Default::default()).into()],
         "ruby-text" => vec![gpdoc_plugin_ruby_text::ruby_text()],
-        "highlight" => vec![gpdoc_plugin_highlight::multicolor_highlight()],
-        "text-align" => vec![gpdoc_plugin_text_align::text_align(["paragraph"])],
+        "highlight" => vec![gpdoc_plugin_highlight::multicolor_highlight().into()],
+        "text-align" => vec![gpdoc_plugin_text_align::text_align(["paragraph"]).into()],
         "text-style" => gpdoc_plugin_text_style::text_style_kit(),
-        "paragraph" | "heading" => vec![heading()],
-        "blockquote" => vec![gpdoc_plugin_blockquote::blockquote()],
-        "bullet-list" | "list-item" => vec![list_item(), bullet_list()],
-        "ordered-list" => vec![list_item(), gpdoc_plugin_ordered_list::ordered_list()],
+        "paragraph" | "heading" => vec![heading().into()],
+        "blockquote" => vec![gpdoc_plugin_blockquote::blockquote().into()],
+        "bullet-list" | "list-item" => vec![list_item().into(), bullet_list().into()],
+        "ordered-list" => vec![
+            list_item().into(),
+            gpdoc_plugin_ordered_list::ordered_list().into(),
+        ],
         "list-keymap" => vec![
-            list_item(),
-            bullet_list(),
-            gpdoc_plugin_list_keymap::list_keymap(),
+            list_item().into(),
+            bullet_list().into(),
+            gpdoc_plugin_list_keymap::list_keymap().into(),
         ],
         "list-kit" => gpdoc_plugin_list_kit::list_kit(),
-        "task-list" => vec![task_item(), task_list()],
-        "hard-break" => vec![gpdoc_plugin_hard_break::hard_break()],
-        "horizontal-rule" => vec![gpdoc_plugin_horizontal_rule::horizontal_rule()],
-        "code-block" => vec![gpdoc_plugin_code_block::code_block()],
-        "code-block-lowlight" => vec![gpdoc_plugin_code_block_lowlight::code_block_lowlight()],
+        "task-list" => vec![task_item().into(), task_list().into()],
+        "hard-break" => vec![gpdoc_plugin_hard_break::hard_break().into()],
+        "horizontal-rule" => vec![gpdoc_plugin_horizontal_rule::horizontal_rule().into()],
+        "code-block" => vec![gpdoc_plugin_code_block::code_block().into()],
+        "code-block-lowlight" => {
+            vec![gpdoc_plugin_code_block_lowlight::code_block_lowlight().into()]
+        }
         "details" => vec![gpdoc_plugin_details::details()],
-        "table" => vec![gpdoc_plugin_table::table()],
-        "image" => vec![gpdoc_plugin_image::image()],
-        "audio" => vec![gpdoc_plugin_audio::audio(Default::default())],
-        "mention" => vec![gpdoc_plugin_mention::mention()],
-        "mathematics" => vec![gpdoc_plugin_mathematics::mathematics()],
-        "character-count" => vec![gpdoc_plugin_character_count::character_count(
-            gpdoc_plugin_character_count::CountOptions {
-                limit: Some(CHARACTER_LIMIT),
-                ..Default::default()
-            },
-        )],
+        "table" => vec![gpdoc_plugin_table::table().into()],
+        "image" => vec![gpdoc_plugin_image::image().into()],
+        "audio" => vec![gpdoc_plugin_audio::audio(Default::default()).into()],
+        "mention" => vec![gpdoc_plugin_mention::mention().into()],
+        "mathematics" => vec![gpdoc_plugin_mathematics::mathematics().into()],
+        "character-count" => vec![
+            gpdoc_plugin_character_count::character_count(
+                gpdoc_plugin_character_count::CountOptions {
+                    limit: Some(CHARACTER_LIMIT),
+                    ..Default::default()
+                },
+            )
+            .into(),
+        ],
         "find-and-replace" => vec![gpdoc_plugin_find_and_replace::find_and_replace()],
         "markdown" => vec![
-            heading(),
-            gpdoc_plugin_bold::bold(),
-            gpdoc_plugin_italic::italic(),
+            heading().into(),
+            gpdoc_plugin_bold::bold().into(),
+            gpdoc_plugin_italic::italic().into(),
             gpdoc_plugin_markdown::markdown(),
         ],
         "table-of-contents" => vec![
-            heading(),
+            heading().into(),
             gpdoc_plugin_table_of_contents::table_of_contents(),
         ],
-        "trailing-node" => vec![heading(), gpdoc_plugin_trailing_node::trailing_node()],
-        "typography" => vec![gpdoc_plugin_typography::typography(Default::default())],
+        "trailing-node" => vec![
+            heading().into(),
+            gpdoc_plugin_trailing_node::trailing_node().into(),
+        ],
+        "typography" => vec![gpdoc_plugin_typography::typography(Default::default()).into()],
         "unique-id" => vec![gpdoc_plugin_unique_id::unique_id(["paragraph"])],
         "suggestion" | "collaboration" | "collaboration-caret" => vec![],
         _ => return Err(format!("Unknown plugin example: {slug}").into()),
     };
     let paragraph = gpdoc_plugin_paragraph::paragraph();
     let config = gpdoc::EditorConfig::builder()
-        .plugins(std::iter::once(paragraph).chain(plugins))
+        .plugin(paragraph)
+        .plugins(plugins)
         .build()?;
     Ok(gpdoc::Editor::from_document(&config, content)?)
 }

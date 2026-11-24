@@ -6,6 +6,12 @@ use regex::Regex;
 
 unit_command!(pub Set, "setHorizontalRule");
 
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        input_rules InputRules { separator: input }
+    }
+}
+
 /// Draw a full-width separator at the rule’s document position.
 #[cfg(feature = "gpui")]
 pub fn rule_line() -> gpdoc::ViewPlugin {
@@ -14,11 +20,11 @@ pub fn rule_line() -> gpdoc::ViewPlugin {
         .node_format("horizontalRule", |_, format| format.horizontal_rule = true)
 }
 
-pub fn horizontal_rule() -> Plugin {
+pub fn horizontal_rule() -> Plugin<Config> {
     let marker = Regex::new(r"^(?:---|—-|___\s|\*\*\*\s)\z").expect("valid rule marker");
-    let plugin = Plugin::new("horizontalRule", |p| {
+    let plugin = Plugin::<Config>::new("horizontalRule", |p| {
         p.node(NodeSpec::block("horizontalRule").group("block"));
-        p.input_rule(move |ctx| {
+        p.input_rules().separator().set(move |ctx| {
             let Selection::Text { anchor, head } = ctx.selection else {
                 return Ok(None);
             };

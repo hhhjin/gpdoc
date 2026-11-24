@@ -13,7 +13,7 @@ use gpdoc_plugin_paragraph::paragraph as paragraph_plugin;
 #[test]
 fn replace_across_paragraphs_and_undo() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph_plugin()])
+        .plugin(paragraph_plugin())
         .build()
         .unwrap();
     let original = vec![Node::text("paragraph", "ab"), Node::text("paragraph", "cd")];
@@ -42,18 +42,16 @@ use gpdoc_plugin::prelude::{
 fn editor_with(blocks: Vec<Node>) -> gpdoc_plugin::core::Editor {
     gpdoc_plugin::core::Editor::from_document(
         &gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([
-                paragraph_plugin(),
-                blockquote(),
-                heading(),
-                bullet_list(),
-                list_item(),
-                ordered_list(),
-                link(Default::default()),
-                inline_code(),
-                bold(),
-                italic(),
-            ])
+            .plugin(paragraph_plugin())
+            .plugin(blockquote())
+            .plugin(heading())
+            .plugin(bullet_list())
+            .plugin(list_item())
+            .plugin(ordered_list())
+            .plugin(link(Default::default()))
+            .plugin(inline_code())
+            .plugin(bold())
+            .plugin(italic())
             .build()
             .unwrap(),
         blocks,
@@ -513,6 +511,53 @@ fn deleting_a_required_paragraph_preserves_its_nested_list() {
 }
 
 #[test]
+fn inline_code_uses_the_custom_delimiter_for_typing_and_paste() {
+    use gpdoc_plugin::core::{Editor, EditorConfig};
+    use gpdoc_plugin::marks::{delimited_mark_input, delimited_mark_paste};
+
+    for delimiter in ["!", "🟣"] {
+        let config = EditorConfig::builder()
+            .plugin(paragraph_plugin())
+            .plugin(inline_code().extend(|p| {
+                p.input_rules()
+                    .backtick()
+                    .set(delimited_mark_input("code", delimiter));
+                p.paste_rules()
+                    .backtick()
+                    .set(delimited_mark_paste("code", delimiter));
+            }))
+            .build()
+            .unwrap();
+        let doubled = format!("{delimiter}{delimiter}x{delimiter}{delimiter}");
+        let single = format!("`{delimiter}x{delimiter}`");
+        for (source, expected, marked_text) in [
+            (doubled.as_str(), doubled.as_str(), &[][..]),
+            (single.as_str(), "`x`", &["x"][..]),
+        ] {
+            let mut typed = Editor::from_config(&config).unwrap();
+            for ch in source.chars() {
+                typed.insert_text(&ch.to_string()).unwrap();
+            }
+            let mut pasted = Editor::from_config(&config).unwrap();
+            pasted.paste_text(source).unwrap();
+            assert_eq!(typed.document(), pasted.document(), "{source}");
+            assert_eq!(pasted.document().root().text_content(), expected);
+            let code: Vec<_> = pasted
+                .document()
+                .iter_nodes()
+                .filter(|(_, node)| node.marks().iter().any(|mark| mark.kind == "code"))
+                .map(|(_, node)| node.projected_text())
+                .collect();
+            assert_eq!(code, marked_text);
+        }
+        let trailing = format!("{delimiter}x{delimiter}{delimiter}");
+        let mut pasted = Editor::from_config(&config).unwrap();
+        pasted.paste_text(&trailing).unwrap();
+        assert_eq!(pasted.document().blocks(), &[paragraph(&trailing)]);
+    }
+}
+
+#[test]
 fn inline_code_excludes_formatting_marks_on_the_same_text() {
     let mut editor = editor_with(vec![paragraph("sample")]);
     editor
@@ -579,7 +624,8 @@ fn paragraph_break_uses_list_handler_and_paste_keeps_heading_type() {
 #[test]
 fn paragraph_break_in_code_replaces_selection_with_literal_newline() {
     let config = gpdoc_plugin::EditorConfig::builder()
-        .plugins([paragraph_plugin(), gpdoc_plugin_code_block::code_block()])
+        .plugin(paragraph_plugin())
+        .plugin(gpdoc_plugin_code_block::code_block())
         .build()
         .unwrap();
     let code = |text| {

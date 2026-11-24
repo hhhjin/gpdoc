@@ -9,15 +9,24 @@ unit_command!(pub Set, "setBlockquote");
 unit_command!(pub Unset, "unsetBlockquote");
 unit_command!(pub Toggle, "toggleBlockquote");
 
-pub fn blockquote() -> Plugin {
-    Plugin::new("blockquote", |p| {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        shortcuts {
+            toggle: Toggle => ["Mod-Shift-b"],
+        }
+        input_rules InputRules { quote_marker: input }
+    }
+}
+
+pub fn blockquote() -> Plugin<Config> {
+    Plugin::<Config>::new("blockquote", |p| {
         p.node(
             NodeSpec::block("blockquote")
                 .group("block")
                 .content("block+"),
         );
         p.drag_handle("blockquote", ["paragraph"]);
-        p.input_rule(wrap_input);
+        p.input_rules().quote_marker().set(wrap_input);
         p.command::<Set>(|editor, _| {
             let blocks = selected_blocks(editor);
             let (Some(first), Some(last)) = (blocks.first(), blocks.last()) else {
@@ -54,7 +63,6 @@ pub fn blockquote() -> Plugin {
             }
             editor.plan(Set)
         });
-        p.shortcut("Mod-Shift-b", Toggle);
     })
 }
 

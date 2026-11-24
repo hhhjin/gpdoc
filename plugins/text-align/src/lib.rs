@@ -17,7 +17,7 @@ impl Command for Toggle {
 unit_command!(pub Unset, "unsetTextAlign");
 
 /// Enable Tiptap's left, center, right and justify commands on the given block types.
-pub fn text_align(types: impl IntoIterator<Item = impl Into<String>>) -> Plugin {
+pub fn text_align(types: impl IntoIterator<Item = impl Into<String>>) -> Plugin<Shortcuts> {
     text_align_with_options(types, TextAlignOptions::default())
 }
 
@@ -38,10 +38,19 @@ impl Default for TextAlignOptions {
     }
 }
 
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        left: Set("left".into()) => ["Mod-Shift-l"],
+        center: Set("center".into()) => ["Mod-Shift-e"],
+        right: Set("right".into()) => ["Mod-Shift-r"],
+        justify: Set("justify".into()) => ["Mod-Shift-j"],
+    }
+}
+
 pub fn text_align_with_options(
     types: impl IntoIterator<Item = impl Into<String>>,
     options: TextAlignOptions,
-) -> Plugin {
+) -> Plugin<Shortcuts> {
     let options = Arc::new(options);
     let default = options
         .default_alignment
@@ -71,14 +80,6 @@ pub fn text_align_with_options(
         let toggle = change(Change::Toggle);
         p.command::<Toggle>(move |ctx, Toggle(alignment)| toggle(ctx, alignment));
         p.command::<Unset>(move |ctx, _| update(ctx, None, &types, &options, Change::Unset));
-        for (key, align) in [
-            ("Mod-Shift-l", "left"),
-            ("Mod-Shift-e", "center"),
-            ("Mod-Shift-r", "right"),
-            ("Mod-Shift-j", "justify"),
-        ] {
-            p.shortcut(key, Set(align.to_owned()));
-        }
     });
     #[cfg(feature = "gpui")]
     let plugin = gpdoc::PluginViewExt::gpui_default_view(plugin, move || {
@@ -203,7 +204,8 @@ mod tests {
         );
         let mut editor = gpdoc_plugin::core::Editor::from_document(
             &gpdoc_plugin::core::EditorConfig::builder()
-                .plugins([align, gpdoc_plugin_paragraph::paragraph()])
+                .plugin(align)
+                .plugin(gpdoc_plugin_paragraph::paragraph())
                 .build()
                 .unwrap(),
             vec![Node::text("paragraph", "text")],

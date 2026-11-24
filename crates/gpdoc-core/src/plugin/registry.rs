@@ -1,9 +1,9 @@
 use super::{
     Plugin,
-    declaration::{Declaration, Targets},
+    declaration::{Declaration, PluginDeclarations, Targets},
 };
 use crate::{
-    AttrSpecs, EditorConfig, EditorHooks, Error, MarkSpec, NodeSpec, Presentation, Schema, Shortcut,
+    AttrSpecs, EditorConfig, EditorHooks, Error, MarkSpec, NodeSpec, Presentation, Schema,
 };
 use std::collections::BTreeMap;
 
@@ -47,8 +47,6 @@ impl Registry {
             Declaration::GlobalAttributes(types, attrs) => {
                 self.global_attributes.push((types, attrs))
             }
-            Declaration::Append(handler) => self.hooks.append.push(handler),
-            Declaration::Filter(handler) => self.hooks.filters.push(handler),
             Declaration::Node(spec) => {
                 self.reserve("node", &spec.name)?;
                 self.nodes.push(spec);
@@ -90,7 +88,7 @@ impl Registry {
 #[derive(Default)]
 #[must_use]
 pub struct EditorConfigBuilder {
-    plugins: Vec<Plugin>,
+    plugins: Vec<PluginDeclarations>,
 }
 
 impl EditorConfig {
@@ -100,13 +98,13 @@ impl EditorConfig {
 }
 
 impl EditorConfigBuilder {
-    pub fn plugin(mut self, plugin: Plugin) -> Self {
-        self.plugins.push(plugin);
-        self
+    pub fn plugin(self, plugin: impl Into<Plugin>) -> Self {
+        self.plugins([plugin])
     }
 
-    pub fn plugins(mut self, plugins: impl IntoIterator<Item = Plugin>) -> Self {
-        self.plugins.extend(plugins);
+    pub fn plugins<P: Into<Plugin>>(mut self, plugins: impl IntoIterator<Item = P>) -> Self {
+        self.plugins
+            .extend(plugins.into_iter().map(|plugin| plugin.into().declarations));
         self
     }
 
@@ -123,7 +121,7 @@ impl EditorConfigBuilder {
         let mut ordered = self.plugins;
         registry.current_plugin = "editor config".into();
         for plugin in &ordered {
-            registry.reserve("plugin", plugin.name())?;
+            registry.reserve("plugin", plugin.registration.name())?;
         }
         ordered.sort_by_key(|plugin| std::cmp::Reverse(plugin.priority));
         for plugin in &mut ordered {
@@ -132,6 +130,14 @@ impl EditorConfigBuilder {
             for declaration in std::mem::take(&mut plugin.declarations) {
                 registry.collect(declaration)?;
             }
+            registry
+                .hooks
+                .append
+                .extend(std::mem::take(&mut plugin.append).active());
+            registry
+                .hooks
+                .filters
+                .extend(std::mem::take(&mut plugin.filters).active());
             for command in std::mem::take(&mut plugin.commands) {
                 registry.reserve("command", command.name())?;
                 registry
@@ -146,7 +152,18 @@ impl EditorConfigBuilder {
         for plugin in ordered {
             let mut keys = BTreeMap::new();
             for (key, command) in plugin.shortcuts {
-                keys.insert(key.parse::<Shortcut>()?, command);
+                if !key.has_valid_key() {
+                    return Err(Error::InvalidSchema(format!(
+                        "invalid shortcut '{key}' in plugin '{}'",
+                        plugin.registration.name()
+                    )));
+                }
+                if keys.insert(key.clone(), command).is_some() {
+                    return Err(Error::InvalidSchema(format!(
+                        "duplicate shortcut '{key}' in plugin '{}'",
+                        plugin.registration.name()
+                    )));
+                }
             }
             for (key, binding) in keys {
                 registry
@@ -156,9 +173,15 @@ impl EditorConfigBuilder {
                     .or_default()
                     .push(binding);
             }
-            registry.hooks.rules.extend(plugin.input_rules);
-            registry.hooks.paste_rules.extend(plugin.paste_rules);
-            registry.hooks.paste_handlers.extend(plugin.paste_handlers);
+            registry.hooks.rules.extend(plugin.input_rules.active());
+            registry
+                .hooks
+                .paste_rules
+                .extend(plugin.paste_rules.active());
+            registry
+                .hooks
+                .paste_handlers
+                .extend(plugin.paste_handlers.active());
         }
         let default = registry.default_block.ok_or_else(|| {
             Error::InvalidSchema("register a default text block before building the config".into())

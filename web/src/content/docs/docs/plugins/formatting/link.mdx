@@ -19,7 +19,7 @@ From your [Quickstart project](/docs/quickstart/), add the plugin.
 cargo add gpdoc-plugin-link
 ```
 
-Build a config with `gpdoc::EditorConfig::builder().plugins([paragraph(), link(LinkOptions::default())]).build()?`.
+Build a config with `gpdoc::EditorConfig::builder().plugin(paragraph()).plugin(link(LinkOptions::default())).build()?`.
 
 ## Example
 

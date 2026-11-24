@@ -7,11 +7,11 @@ use gpdoc_plugin_task_list::{task_item, task_list};
 
 pub fn list_kit() -> Vec<Plugin> {
     vec![
-        bullet_list(),
-        list_item(),
-        list_keymap(),
-        ordered_list(),
-        task_item(),
-        task_list(),
+        bullet_list().into(),
+        list_item().into(),
+        list_keymap().into(),
+        ordered_list().into(),
+        task_item().into(),
+        task_list().into(),
     ]
 }

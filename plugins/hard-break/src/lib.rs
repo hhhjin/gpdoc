@@ -4,7 +4,13 @@ use gpdoc_plugin::prelude::{
 
 unit_command!(pub Set, "setHardBreak");
 
-pub fn hard_break() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        insert: Set => ["Shift-Enter", "Mod-Enter"],
+    }
+}
+
+pub fn hard_break() -> Plugin<Shortcuts> {
     Plugin::new("hardBreak", |p| {
         p.node(
             NodeSpec::inline("hardBreak")
@@ -38,7 +44,5 @@ pub fn hard_break() -> Plugin {
             tx.set_stored_marks(marks);
             Ok(Some(tx))
         });
-        p.shortcut("Shift-Enter", Set);
-        p.shortcut("Mod-Enter", Set);
     })
 }
