@@ -3,12 +3,13 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
   publish:
-    if: vars.RELEASE_PLZ_ENABLED == 'true'
+    if: github.event_name == 'push' && vars.RELEASE_PLZ_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -50,7 +51,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-pr:
-    needs: publish
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.RELEASE_PLZ_ENABLED == 'true'
     # The published gpdoc 0.1.0 baseline predates the Linux libc pin for xattr.
     # TODO: Restore ubuntu-latest and remove the Metal setup once a gpdoc release
     # with the libc 0.2.189 pin is on crates.io and serves as the semver baseline.
@@ -73,6 +74,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   web-changes:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
