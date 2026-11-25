@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
     types: [closed]
@@ -11,20 +9,23 @@ permissions: {}
 
 jobs:
   publish:
-    if: github.event_name == 'push' && vars.RELEASE_PLZ_ENABLED == 'true'
+    if: >-
+      github.event.pull_request.merged &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'next' &&
+      vars.RELEASE_PLZ_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
       id-token: write
     steps:
-      - &checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
           persist-credentials: false
-      - &rust
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
         with:
           toolchain: stable
       - name: Check package licenses
@@ -46,33 +47,5 @@ jobs:
         with:
           command: release
           config: .github/release-publish.toml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release-pr:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.merged &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'next' &&
-      vars.RELEASE_PLZ_ENABLED == 'true'
-    # The published gpdoc 0.1.0 baseline predates the Linux libc pin for xattr.
-    # TODO: Restore ubuntu-latest and remove the Metal setup once a gpdoc release
-    # with the libc 0.2.189 pin is on crates.io and serves as the semver baseline.
-    runs-on: macos-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    concurrency:
-      group: release-pr-${{ github.ref }}
-      cancel-in-progress: false
-    steps:
-      - *checkout
-      - *rust
-      - name: Ensure the Metal compiler is available for GPUI
-        run: xcrun -sdk macosx metal --version || xcodebuild -downloadComponent MetalToolchain
-      - uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5
-        with:
-          command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

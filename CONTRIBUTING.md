@@ -19,24 +19,8 @@ In your pull request, describe the user-visible change and list the checks you r
 
 ## Choose a target branch
 
-Open editor, plugin, and feature documentation PRs against `next`. Site styling changes can go directly to `main`. Every push to `main` deploys the website, including its documentation and playground.
+Open editor, plugin, and feature documentation PRs against `next`. Site styling changes can go directly to `main`.
 
-When the features on `next` are ready, merge `next` into `main` with a merge commit to preserve the individual changes for the changelog. This deploys the site and asks release-plz to open a release PR for changed crates. Review and merge that PR to publish to crates.io. Merge `main` back into `next` to carry over site fixes, released versions, and changelogs.
+## Write a PR title
 
-## Write commits for release notes
-
-Release-plz generates each crate's `CHANGELOG.md` in the release PR from the commits that land on `main`. You can skip changelog edits in a feature or bug-fix PR.
-
-Write Conventional Commit titles in English using `type(scope): description`. Describe what changes for the user.
-
-- **Squash merge.** Use this format for the PR title. Individual commits on your branch can use any title. The maintainer can edit the final squash commit title at merge time.
-- **Merge or rebase that preserves individual commits.** Use this format for each commit that lands on `main`.
-
-Choose the type that describes the change.
-
-- Use `feat` for a new capability, for example `feat(table): add a command to split merged cells`.
-- Use `fix` for a bug fix, for example `fix(bold): preserve the selection when toggling bold`.
-- Use `docs` for documentation and `ci` for workflow changes. The scope in parentheses is optional.
-- For a breaking change, add `!` before the colon and explain the migration in a `BREAKING CHANGE:` footer.
-
-Review the proposed versions and changelog entries in the release PR. Add any migration steps that users need to the generated entry before merging.
+Write the PR title in English using `type(scope): description`. The scope is optional. Describe what changes for the user, for example `fix(bold): preserve the selection when toggling bold`.

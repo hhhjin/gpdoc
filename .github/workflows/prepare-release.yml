@@ -1,0 +1,60 @@
+name: Prepare release
+
+on: workflow_dispatch
+
+permissions: {}
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/next' && vars.RELEASE_PLZ_ENABLED == 'true'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: prepare-release-next
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: next
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+        with:
+          toolchain: stable
+      - name: Ensure the Metal compiler is available for GPUI
+        run: xcrun -sdk macosx metal --version || xcodebuild -downloadComponent MetalToolchain
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: cargo-semver-checks@0.51
+      - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.2
+      - name: Prepare versions and changelogs
+        run: |
+          cargo binstall release-plz@0.4.3 --no-confirm --strategies=crate-meta-data,compile
+          release-plz update
+      - name: Commit release changes and open the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- Cargo.lock ':(glob)**/Cargo.toml' Cargo.toml ':(glob)**/CHANGELOG.md'
+            git commit -m 'chore: prepare release'
+          fi
+
+          if git diff --quiet origin/main...HEAD; then
+            echo 'No changes to release.'
+            exit 0
+          fi
+
+          gh auth setup-git
+          git push origin HEAD:refs/heads/next
+          pr=$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open -f base=main -f "head=$GITHUB_REPOSITORY_OWNER:next" --jq '.[0].html_url // empty')
+          if [[ -z "$pr" ]]; then
+            pr=$(gh pr create --base main --head next --title 'chore: release' \
+              --body 'Review the crate versions and changelogs, then merge with a merge commit to publish.')
+          fi
+          echo "Release PR: $pr" >> "$GITHUB_STEP_SUMMARY"

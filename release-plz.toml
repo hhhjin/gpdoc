@@ -1,5 +1,5 @@
 [workspace]
-# Publish the versions approved in a merged release PR.
+# Keep standalone release commands gated. CI uses .github/release-publish.toml.
 release_always = false
-# Generate each crate's changelog in the release PR.
+# Prepare each crate's changelog on next.
 changelog_update = true
