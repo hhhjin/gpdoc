@@ -5,7 +5,8 @@ use gpdoc_plugin_paragraph::paragraph;
 
 fn pair() -> (Collaboration, Collaboration) {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), bold()])
+        .plugin(paragraph())
+        .plugin(bold())
         .build()
         .unwrap();
     let alice = Collaboration::new(
@@ -111,7 +112,7 @@ fn out_of_order_updates_integrate_when_their_dependencies_arrive() {
 fn deleting_first_of_identical_siblings_keeps_the_concurrently_edited_last_block() {
     use gpdoc_plugin::core::Edit;
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph()])
+        .plugin(paragraph())
         .build()
         .unwrap();
     let mut alice = Collaboration::new(
@@ -165,7 +166,8 @@ fn deleting_first_of_identical_siblings_keeps_the_concurrently_edited_last_block
 #[test]
 fn repeated_characters_keep_their_identity_in_a_concurrent_deletion() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), bold()])
+        .plugin(paragraph())
+        .plugin(bold())
         .build()
         .unwrap();
     let mut alice = Collaboration::new(
@@ -210,7 +212,8 @@ fn repeated_characters_keep_their_identity_in_a_concurrent_deletion() {
 #[test]
 fn text_from_two_concurrent_insertions_into_empty_blocks_keeps_both_remote_carets() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), bold()])
+        .plugin(paragraph())
+        .plugin(bold())
         .build()
         .unwrap();
     let mut alice = Collaboration::new(
@@ -247,15 +250,11 @@ fn text_from_two_concurrent_insertions_into_empty_blocks_keeps_both_remote_caret
 fn a_remote_transaction_rejected_by_a_local_doc_filter_leaves_the_yrs_state_intact() {
     let (mut sender, _) = pair();
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            bold(),
-            Plugin::new("lengthLimit", |p| {
-                p.filter_transaction(|ctx| {
-                    Ok(ctx.document.root().text_content().chars().count() <= 3)
-                });
-            }),
-        ])
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(Plugin::<()>::new("lengthLimit", |p| {
+            p.filter_transaction(|ctx| Ok(ctx.document.root().text_content().chars().count() <= 3));
+        }))
         .build()
         .unwrap();
     let mut receiver = Collaboration::from_update(
@@ -292,7 +291,8 @@ fn rectangular_selection_round_trips_between_kits_and_clears_each_cell_once() {
     use gpdoc_plugin_table::{cell_selection, table};
     let config = || {
         gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), table()])
+            .plugin(paragraph())
+            .plugin(table())
             .build()
             .unwrap()
     };
@@ -331,7 +331,7 @@ fn rectangular_selection_round_trips_between_kits_and_clears_each_cell_once() {
     );
     let mut plain = gpdoc_plugin::core::Editor::from_document(
         &gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph()])
+            .plugin(paragraph())
             .build()
             .unwrap(),
         vec![Node::text("paragraph", "")],

@@ -7,7 +7,8 @@ use std::io::{Read, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), bold()])
+        .plugin(paragraph())
+        .plugin(bold())
         .build()?;
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;

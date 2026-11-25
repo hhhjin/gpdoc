@@ -17,25 +17,23 @@ use serde_json::json;
 use std::io;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            heading(),
-            blockquote(),
-            ordered_list(),
-            list_item(),
-            bold(),
-            italic(),
-            link(Default::default()),
-            inline_code(),
-            code_block(),
-            strike(),
-            horizontal_rule(),
-            gpdoc_plugin_task_list::task_list(),
-            gpdoc_plugin_task_list::task_item(),
-            gpdoc_plugin_table::table(),
-            gpdoc_plugin_image::image(),
-            gpdoc_plugin_mathematics::mathematics(),
-        ])
+        .plugin(paragraph())
+        .plugin(heading())
+        .plugin(blockquote())
+        .plugin(ordered_list())
+        .plugin(list_item())
+        .plugin(bold())
+        .plugin(italic())
+        .plugin(link(Default::default()))
+        .plugin(inline_code())
+        .plugin(code_block())
+        .plugin(strike())
+        .plugin(horizontal_rule())
+        .plugin(gpdoc_plugin_task_list::task_list())
+        .plugin(gpdoc_plugin_task_list::task_item())
+        .plugin(gpdoc_plugin_table::table())
+        .plugin(gpdoc_plugin_image::image())
+        .plugin(gpdoc_plugin_mathematics::mathematics())
         .build()?;
     let inputs: Vec<String> = serde_json::from_reader(io::stdin().lock())?;
     let mut results = Vec::new();

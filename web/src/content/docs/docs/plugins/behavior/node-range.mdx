@@ -16,13 +16,13 @@ Press it again to include “Review the draft”. Press **Shift + Up Arrow** to 
 
 You can also hold Command on macOS or Control on Windows and Linux while dragging across two paragraphs. Release the mouse button while holding the key to select both blocks.
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register its input handler with the editor.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-node-range
 ```
+
+## Example
 
 ```rust
 use gpdoc_plugin_node_range::node_range;
@@ -30,7 +30,8 @@ use gpdoc_plugin_node_range::node_range;
 let config = gpdoc::EditorConfig::builder()
     .plugin(gpdoc_plugin_paragraph::paragraph())
     .plugin(node_range())
-    .build()?;
+    .build()
+    .expect("configure editor");
 ```
 
 With a [drag handle](/docs/plugins/behavior/drag-handle/) installed, dragging a handle inside the selected range moves the blocks together.

@@ -55,7 +55,6 @@ gpdoc-plugin-italic = { path = "plugins/italic", version = "0.1.0", default-feat
 gpdoc-plugin-link = { path = "plugins/link", version = "0.1.0", default-features = false }
 gpdoc-plugin-list-item = { path = "plugins/list-item", version = "0.1.0", default-features = false }
 gpdoc-plugin-list-keymap = { path = "plugins/list-keymap", version = "0.1.0" }
-gpdoc-plugin-list-kit = { path = "plugins/list-kit", version = "0.1.0", default-features = false }
 gpdoc-plugin-mathematics = { path = "plugins/mathematics", version = "0.1.0", default-features = false }
 gpdoc-plugin-mention = { path = "plugins/mention", version = "0.1.0", default-features = false }
 gpdoc-plugin-box-selection = { path = "plugins/box-selection", version = "0.1.0" }

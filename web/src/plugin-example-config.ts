@@ -95,7 +95,7 @@ export const pluginExamples = {
     action("splitListItem", "Split item"), action("sinkListItem", "Indent"), action("liftListItem", "Outdent")), 8),
   "list-keymap": withSelection(example("First item", "Place the caret at the start of the item and press Backspace to lift it out of the list.",
     action("listBackspace", "Backspace")), 3),
-  "list-kit": example("Review the copy", "Switch list types from the toolbar or type a list marker in an empty paragraph.",
+  lists: example("Review the copy", "Switch list types from the toolbar or type a list marker in an empty paragraph.",
     action("toggleBulletList", "Bullet list"), action("toggleOrderedList", "Numbered list"), task),
   "task-list": example("Write the release notes", "Make a task list, then click a checkbox. You can also type [x] followed by a space on an empty line.",
     task),

@@ -12,16 +12,21 @@ unit_command!(pub Split, "splitListItem");
 unit_command!(pub Sink, "sinkListItem");
 unit_command!(pub Lift, "liftListItem");
 
-pub fn list_item() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        sink: Sink => ["Tab"],
+        lift: Lift => ["Shift-Tab"],
+    }
+}
+
+pub fn list_item() -> Plugin<Shortcuts> {
     let plugin = Plugin::new("listItem", |p| {
         p.node(NodeSpec::block(LIST_ITEM).content("paragraph block*"));
         p.drag_handle(LIST_ITEM, ["paragraph"]);
         p.command::<Split>(|ctx, _| split_item(ctx, LIST_ITEM));
         p.on_break(LIST_ITEM, |ctx| ctx.plan(Split));
         p.command::<Sink>(|ctx, _| sink_item(ctx, LIST_ITEM));
-        p.shortcut("Tab", Sink);
         p.command::<Lift>(|ctx, _| lift_item(ctx, LIST_ITEM));
-        p.shortcut("Shift-Tab", Lift);
     });
     #[cfg(feature = "gpui")]
     let plugin = {
@@ -32,7 +37,7 @@ pub fn list_item() -> Plugin {
 }
 
 /// Register a list container for list items.
-pub fn list_container(p: &mut PluginSpec, kind: &'static str, attrs: AttrSpecs) {
+pub fn list_container<S>(p: &mut PluginSpec<S>, kind: &'static str, attrs: AttrSpecs) {
     p.node(
         NodeSpec::block(kind)
             .group("block")

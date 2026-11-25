@@ -19,44 +19,70 @@ cargo add gpdoc-plugin-image
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), insert an image using a path your host app can resolve.
+Register the view that draws each image at its stored size in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_image::image;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_image::{image, image_content};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(image())
-    .build()?;
-let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
-editor.run(gpdoc_plugin_image::Set {
-    src: "images/swallow.png".into(),
-    alt: Some("A swallow in flight".into()),
-    width: std::num::NonZeroU32::new(240),
-    ..Default::default()
-})?;
+    .plugin(image().with_view(image_tools))
+    .build()
+    .expect("configure editor");
 
-assert_eq!(editor.document().blocks()[0].kind, "image");
+fn image_tools() -> ViewPlugin {
+    image_content()
+}
 ```
 
-The first block now holds the source, description, and width. The value `240` sets the display width in pixels. The host needs an asset at `images/swallow.png` to draw the picture.
+Type `![A swallow](images/swallow.png)` at the start of a paragraph. Supply the asset at that path to see the image. The editor shows the alt text while the image is unavailable.
 
-## Native view
+## Compose an image control
 
-The default image view draws the resource using its stored dimensions and displays the alt text while the resource is unavailable.
+Use `image_controls` to place a GPUI element over the picture. The editor clips the element to the image bounds.
+
+### Anatomy
+
+```text
+image_controls(...)       Draws the picture and supplies its ImageNode
+└── div()                 Your overlay
+    └── div().on_click()  Your button to apply image.resize(...)
+```
+
+### Restore the original image size
+
+In the example above, replace the `image_content` import with `image_controls`. Use this version of `image_tools` to add a reset button to images with a stored width or height.
 
 ```rust
-use gpdoc_plugin_image::image;
+use gpui::{div, prelude::*};
 
-let config = gpdoc::EditorConfig::builder()
-    .plugin(gpdoc_plugin_paragraph::paragraph())
-    .plugin(image())
-    .build()?;
+fn image_tools() -> ViewPlugin {
+    image_controls(|image, _, _| {
+        let overlay = div();
+        if image.dimensions() == (None, None) {
+            return overlay;
+        }
+
+        let reset = image.resize(None, None);
+        let editor = image.slot.view.clone();
+        let button = div()
+            .id(("original-image-size", image.slot.before.0))
+            .child("Original size")
+            .on_click(move |_, window, cx| {
+                editor.update(cx, |view, cx| {
+                    if let Err(error) = view.apply_node_view(reset.clone(), window, cx) {
+                        eprintln!("Could not resize image: {error}");
+                    }
+                });
+            });
+        overlay.child(button)
+    })
+}
 ```
 
-For a custom view, pass your own named function to `with_view`. Return `image_controls(render)` from that function to place controls over the projected image. The renderer receives an `ImageNode` with the image source, alt text and dimensions. Its `resize(width, height)` method prepares an undoable transaction. Pass the transaction to `Editor::apply_node_view` when the user confirms the new dimensions. A dimension set to `None` follows the intrinsic aspect ratio.
+Insert the 240-pixel image from the `setImage` example below. The image shows an **Original size** button. Click the button to clear both stored dimensions. Undo restores the width and the button. To set a specific size, pass a positive pixel value to `resize` for either dimension. Leaving one dimension at `None` preserves the aspect ratio.
 
 ## Settings
 
@@ -77,6 +103,8 @@ Inserts an image at the caret or replaces the selection. Supply the image source
 ```rust
 editor.run(gpdoc_plugin_image::Set {
     src: "images/swallow.png".into(),
+    alt: Some("A swallow in flight".into()),
+    width: std::num::NonZeroU32::new(240),
     ..Default::default()
 })?;
 ```

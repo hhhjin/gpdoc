@@ -1,5 +1,7 @@
 //! Collect schema declarations and editing behavior for one installable feature.
-use super::CommandResult;
+use super::{
+    CommandResult, InputRules, PasteRules, RuleEditor, RuleGroup, TransactionHooks, rules::RuleList,
+};
 use crate::{
     AppendTransaction, AttrSpecs, Attrs, Command, CommandContext, CommandRegistration,
     DocumentChange, DragHandleScope, Edit, Error, FilterTransaction, Highlighter, InputRule,
@@ -38,8 +40,6 @@ pub(super) enum Declaration {
     DragHandle(String, DragHandleScope),
     Node(NodeSpec),
     Mark(MarkSpec),
-    Append(AppendTransaction),
-    Filter(FilterTransaction),
     Break(String, crate::BreakHandler),
     DefaultBlock(String),
     DocumentContent(String),
@@ -48,63 +48,111 @@ pub(super) enum Declaration {
 /// An installable feature. A single feature may own any number of schema types and commands.
 #[derive(Clone)]
 #[must_use]
-pub struct Plugin {
+pub struct Plugin<S = ()> {
+    pub(super) declarations: PluginDeclarations,
+    config: S,
+}
+
+/// The configuration available both when declaring and when extending a plugin.
+pub struct PluginSpec<'a, S = ()> {
+    plugin: &'a mut PluginDeclarations,
+    config: &'a mut S,
+}
+
+#[derive(Clone)]
+pub(super) struct PluginDeclarations {
     pub(super) registration: InstalledPlugin,
     pub(super) priority: i32,
     pub(super) declarations: Vec<Declaration>,
     pub(super) commands: Vec<CommandRegistration>,
-    pub(super) shortcuts: Vec<(String, StoredCommand)>,
-    pub(super) input_rules: Vec<InputRule>,
-    pub(super) paste_rules: Vec<PasteRule>,
-    pub(super) paste_handlers: Vec<PasteHandler>,
+    pub(super) shortcuts: Vec<(crate::Shortcut, StoredCommand)>,
+    pub(super) input_rules: RuleList<InputRule>,
+    pub(super) paste_rules: RuleList<PasteRule>,
+    pub(super) paste_handlers: RuleList<PasteHandler>,
+    pub(super) filters: RuleList<FilterTransaction>,
+    pub(super) append: RuleList<AppendTransaction>,
 }
 
-impl Plugin {
-    pub fn new(name: impl Into<String>, declare: impl FnOnce(&mut PluginSpec)) -> Self {
-        let plugin = Self {
-            registration: InstalledPlugin::new(name),
-            priority: 100,
-            declarations: vec![],
-            commands: vec![],
-            shortcuts: vec![],
-            input_rules: vec![],
-            paste_rules: vec![],
-            paste_handlers: vec![],
-        };
-        let mut spec = PluginSpec { plugin };
-        declare(&mut spec);
-        spec.plugin
+impl<S: Default> Plugin<S> {
+    /// Start with the configuration defaults of the plugin's return type.
+    pub fn new(name: impl Into<String>, declare: impl FnOnce(&mut PluginSpec<'_, S>)) -> Self {
+        Self {
+            declarations: PluginDeclarations {
+                registration: InstalledPlugin::new(name),
+                priority: 100,
+                declarations: vec![],
+                commands: vec![],
+                shortcuts: vec![],
+                input_rules: RuleList::default(),
+                paste_rules: RuleList::default(),
+                paste_handlers: RuleList::default(),
+                filters: RuleList::default(),
+                append: RuleList::default(),
+            },
+            config: S::default(),
+        }
+        .extend(declare)
+    }
+}
+
+impl<S> Plugin<S> {
+    /// Customize this plugin before installation. Extensions compose in call order.
+    pub fn extend(mut self, configure: impl FnOnce(&mut PluginSpec<'_, S>)) -> Self {
+        configure(&mut PluginSpec {
+            plugin: &mut self.declarations,
+            config: &mut self.config,
+        });
+        self
     }
 
     pub fn name(&self) -> &str {
-        self.registration.name()
+        self.declarations.registration.name()
     }
 
     /// Read host-specific metadata before compiling the editor config.
     pub fn metadata<T: Any>(&self) -> Option<&T> {
-        self.registration.data()
+        self.declarations.registration.data()
     }
 
     /// Attach a typed host integration to this plugin.
     pub fn with_metadata<T: Any + Send + Sync>(mut self, value: T) -> Self {
-        self.registration.register_metadata(value);
+        self.declarations.registration.register_metadata(value);
         self
     }
 
     /// Set priority when composing a config. Higher numbers run first; the default is 100.
     /// Equal-priority shortcut and input-rule ties favor later plugins.
     pub fn priority(mut self, priority: i32) -> Self {
-        self.priority = priority;
+        self.declarations.priority = priority;
         self
     }
 }
 
-/// The declarations collected by `Plugin::new`. References are resolved when the config is built.
-pub struct PluginSpec {
-    plugin: Plugin,
-}
+impl<S> PluginSpec<'_, S> {
+    /// Edit the typing rules exposed by this plugin.
+    pub fn input_rules(&mut self) -> <S as RuleGroup<InputRules>>::Access<'_>
+    where
+        S: RuleGroup<InputRules>,
+    {
+        RuleEditor(self.plugin).into()
+    }
 
-impl PluginSpec {
+    /// Edit the clipboard handlers and paste rules exposed by this plugin.
+    pub fn paste_rules(&mut self) -> <S as RuleGroup<PasteRules>>::Access<'_>
+    where
+        S: RuleGroup<PasteRules>,
+    {
+        RuleEditor(self.plugin).into()
+    }
+
+    /// Edit the transaction filters and append handlers exposed by this plugin.
+    pub fn hooks(&mut self) -> <S as RuleGroup<TransactionHooks>>::Access<'_>
+    where
+        S: RuleGroup<TransactionHooks>,
+    {
+        RuleEditor(self.plugin).into()
+    }
+
     pub fn node(&mut self, spec: NodeSpec) {
         self.plugin.declarations.push(Declaration::Node(spec));
     }
@@ -149,12 +197,12 @@ impl PluginSpec {
         self.plugin.commands.push(CommandRegistration::new(run));
     }
 
-    pub fn shortcut(&mut self, key: impl Into<String>, command: impl Command) {
+    pub fn shortcut(&mut self, key: crate::Shortcut, command: impl Command) {
         self.shortcut_stored(key, StoredCommand::new(command));
     }
 
-    pub fn shortcut_stored(&mut self, key: impl Into<String>, command: StoredCommand) {
-        self.plugin.shortcuts.push((key.into(), command));
+    pub fn shortcut_stored(&mut self, key: crate::Shortcut, command: StoredCommand) {
+        self.plugin.shortcuts.push((key, command));
     }
 
     /// Handle a paragraph break in this block. Return None to use the next handler.
@@ -218,18 +266,14 @@ impl PluginSpec {
         &mut self,
         handler: impl Fn(DocumentChange<'_>) -> Result<Vec<Edit>, Error> + Send + Sync + 'static,
     ) {
-        self.plugin
-            .declarations
-            .push(Declaration::Append(Arc::new(handler)));
+        self.plugin.append.push(Arc::new(handler));
     }
 
     pub fn filter_transaction(
         &mut self,
         handler: impl Fn(DocumentChange<'_>) -> Result<bool, Error> + Send + Sync + 'static,
     ) {
-        self.plugin
-            .declarations
-            .push(Declaration::Filter(Arc::new(handler)));
+        self.plugin.filters.push(Arc::new(handler));
     }
 
     /// Give this block a drag handle. Dragging any of its named direct children
@@ -273,5 +317,27 @@ impl PluginSpec {
             kind.into(),
             Arc::new(highlight),
         ));
+    }
+}
+
+impl<S: super::PluginShortcuts> PluginSpec<'_, S> {
+    /// The plugin-specific actions exposed for rebinding.
+    pub fn shortcuts(&mut self) -> &mut S {
+        self.config
+    }
+}
+
+impl<S: super::PluginConfig> From<Plugin<S>> for Plugin {
+    fn from(plugin: Plugin<S>) -> Self {
+        let mut declarations = plugin.declarations;
+        for action in plugin.config.into_shortcuts() {
+            for key in action.keys.0 {
+                declarations.shortcuts.push((key, action.command.clone()));
+            }
+        }
+        Plugin {
+            declarations,
+            config: (),
+        }
     }
 }

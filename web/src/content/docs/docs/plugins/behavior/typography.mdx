@@ -19,7 +19,7 @@ Run this from a [Quickstart project](/docs/quickstart/).
 cargo add gpdoc-plugin-typography
 ```
 
-## Convert typed punctuation
+## Example
 
 With the paragraph plugin installed, type three periods in an empty paragraph to insert an ellipsis.
 
@@ -31,7 +31,8 @@ use gpdoc_plugin_typography::{typography, TypographyOptions};
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(typography(Default::default()))
-    .build()?;
+    .build()
+    .expect("configure editor");
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
 for _ in 0..3 {
 	editor.insert_text(".")?;

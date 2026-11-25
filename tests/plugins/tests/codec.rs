@@ -29,14 +29,12 @@ fn task() -> Plugin {
 #[test]
 fn opens_prosemirror_json_and_preserves_structure_across_an_edit() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            blockquote(),
-            heading(),
-            bold(),
-            link(Default::default()),
-            task(),
-        ])
+        .plugin(paragraph())
+        .plugin(blockquote())
+        .plugin(heading())
+        .plugin(bold())
+        .plugin(link(Default::default()))
+        .plugin(task())
         .build()
         .unwrap();
     let source = json!({"type":"doc","content":[
@@ -65,13 +63,11 @@ fn opens_prosemirror_json_and_preserves_structure_across_an_edit() {
     );
 
     let standard = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            blockquote(),
-            heading(),
-            bold(),
-            link(Default::default()),
-        ])
+        .plugin(paragraph())
+        .plugin(blockquote())
+        .plugin(heading())
+        .plugin(bold())
+        .plugin(link(Default::default()))
         .build()
         .unwrap();
     assert!(matches!(
@@ -85,7 +81,10 @@ fn opens_prosemirror_json_and_preserves_structure_across_an_edit() {
 #[test]
 fn rejects_invalid_and_unrepresentable_input() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), heading(), bullet_list(), list_item()])
+        .plugin(paragraph())
+        .plugin(heading())
+        .plugin(bullet_list())
+        .plugin(list_item())
         .build()
         .unwrap();
     for node in [
@@ -111,14 +110,12 @@ fn rejects_invalid_and_unrepresentable_input() {
 #[test]
 fn preserves_tiptap_list_names_and_nullable_mark_attributes() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            list_item(),
-            ordered_list(),
-            link(Default::default()),
-            italic(),
-            bold(),
-        ])
+        .plugin(paragraph())
+        .plugin(list_item())
+        .plugin(ordered_list())
+        .plugin(link(Default::default()))
+        .plugin(italic())
+        .plugin(bold())
         .build()
         .unwrap();
     let source = include_str!("tiptap-list.json");
@@ -145,7 +142,9 @@ fn preserves_tiptap_list_names_and_nullable_mark_attributes() {
 #[test]
 fn deepest_supported_marked_text_reopens() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), blockquote(), link(Default::default())])
+        .plugin(paragraph())
+        .plugin(blockquote())
+        .plugin(link(Default::default()))
         .build()
         .unwrap();
     let mut node = Node::new(
@@ -198,7 +197,10 @@ fn mention() -> Plugin {
 fn plugin_leaf_next_to_emoji_survives_edits_and_prosemirror_json() {
     use gpdoc_plugin::prelude::{Attrs, DocPos, Edit, Selection, Value};
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), code_block(), bold(), mention()])
+        .plugin(paragraph())
+        .plugin(code_block())
+        .plugin(bold())
+        .plugin(mention())
         .build()
         .unwrap();
     let mut editor =
@@ -291,11 +293,13 @@ fn schemas_own_their_mark_names() {
     }
 
     let standard = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), bold()])
+        .plugin(paragraph())
+        .plugin(bold())
         .build()
         .unwrap();
     let custom = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), strong()])
+        .plugin(paragraph())
+        .plugin(strong())
         .build()
         .unwrap();
     for (name, owner, other) in [("bold", &standard, &custom), ("strong", &custom, &standard)] {

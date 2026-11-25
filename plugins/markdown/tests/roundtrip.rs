@@ -15,18 +15,16 @@ use gpdoc_plugin_paragraph::paragraph;
 #[test]
 fn markdown_roundtrip_preserves_structure_markup_and_unicode() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            heading(),
-            blockquote(),
-            ordered_list(),
-            list_item(),
-            bold(),
-            italic(),
-            link(Default::default()),
-            inline_code(),
-            code_block(),
-        ])
+        .plugin(paragraph())
+        .plugin(heading())
+        .plugin(blockquote())
+        .plugin(ordered_list())
+        .plugin(list_item())
+        .plugin(bold())
+        .plugin(italic())
+        .plugin(link(Default::default()))
+        .plugin(inline_code())
+        .plugin(code_block())
         .build()
         .unwrap();
     let source = "# Hello 😀\n\n> **bold**, *italic*, [link](https://example.org) and `x`\n\n3. first\n4. second\n\n```rust\nfn main() {}\n```";
@@ -49,7 +47,7 @@ fn markdown_roundtrip_preserves_structure_markup_and_unicode() {
 #[test]
 fn missing_plugins_warn_and_preserve_text() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph()])
+        .plugin(paragraph())
         .build()
         .unwrap();
     let result = open(&config, "# **Hello**").unwrap();
@@ -61,7 +59,10 @@ fn missing_plugins_warn_and_preserve_text() {
 #[test]
 fn set_markdown_replaces_content_in_one_undo_step() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([paragraph(), heading(), horizontal_rule(), markdown()])
+        .plugin(paragraph())
+        .plugin(heading())
+        .plugin(horizontal_rule())
+        .plugin(markdown())
         .build()
         .unwrap();
     let mut editor =
@@ -85,18 +86,16 @@ fn conflicting_delimiters_fail_before_set_markdown_changes_history() {
     use gpdoc_plugin::prelude::{Error, MarkSpec, Plugin};
     use gpdoc_plugin_markdown::MarkdownSyntax;
     let marked = |name, token| {
-        Plugin::new(name, |p| {
+        Plugin::<()>::new(name, |p| {
             p.mark(MarkSpec::new(name));
             p.metadata(MarkdownSyntax::default().mark(name, token));
         })
     };
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            markdown(),
-            marked("one", "=="),
-            marked("two", "==="),
-        ])
+        .plugin(paragraph())
+        .plugin(markdown())
+        .plugin(marked("one", "=="))
+        .plugin(marked("two", "==="))
         .build()
         .unwrap();
     let mut editor = gpdoc_plugin::core::Editor::from_document(
@@ -118,7 +117,7 @@ fn custom_syntax_is_scoped_to_the_kit_and_preserves_literal_tokens() {
     use gpdoc_plugin::prelude::{MarkSpec, Plugin};
     use gpdoc_plugin_markdown::MarkdownSyntax;
     let note = |token| {
-        Plugin::new("notes", |p| {
+        Plugin::<()>::new("notes", |p| {
             p.mark(MarkSpec::new("note"));
             p.metadata(MarkdownSyntax::default().mark("note", token));
         })
@@ -127,7 +126,10 @@ fn custom_syntax_is_scoped_to_the_kit_and_preserves_literal_tokens() {
     let variant = note("++");
     for (plugin, own, other) in [(original, "==", "++"), (variant, "++", "==")] {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), inline_code(), code_block(), plugin])
+            .plugin(paragraph())
+            .plugin(inline_code())
+            .plugin(code_block())
+            .plugin(plugin)
             .build()
             .unwrap();
         let source = format!(
@@ -157,14 +159,12 @@ fn a_custom_delimiter_in_image_alt_text_is_literal() {
     use gpdoc_plugin::prelude::{MarkSpec, Plugin};
     use gpdoc_plugin_markdown::MarkdownSyntax;
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            paragraph(),
-            gpdoc_plugin_image::image(),
-            Plugin::new("notes", |p| {
-                p.mark(MarkSpec::new("note"));
-                p.metadata(MarkdownSyntax::default().mark("note", "=="));
-            }),
-        ])
+        .plugin(paragraph())
+        .plugin(gpdoc_plugin_image::image())
+        .plugin(Plugin::<()>::new("notes", |p| {
+            p.mark(MarkSpec::new("note"));
+            p.metadata(MarkdownSyntax::default().mark("note", "=="));
+        }))
         .build()
         .unwrap();
     let imported = open(&config, "![==caption==](/photo.png)").unwrap();

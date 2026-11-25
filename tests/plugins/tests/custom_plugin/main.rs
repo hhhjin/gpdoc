@@ -23,8 +23,11 @@ pub fn snippets() -> Plugin {
             insert_snippet(ctx, last.0.clone())
         });
 
-        p.shortcut("Mod-Alt-j", InsertSnippet { text: "Hi!".into() });
-        p.shortcut("Mod-Shift-j", RepeatSnippet);
+        p.shortcut(
+            gpdoc_plugin::key!("Mod-Alt-j"),
+            InsertSnippet { text: "Hi!".into() },
+        );
+        p.shortcut(gpdoc_plugin::key!("Mod-Shift-j"), RepeatSnippet);
     })
 }
 

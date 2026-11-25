@@ -29,7 +29,16 @@ fn list_attrs(start: Option<i64>, list_type: Option<String>) -> Attrs {
     attrs
 }
 
-pub fn ordered_list() -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        shortcuts {
+            toggle: Toggle::default() => ["Mod-Shift-7"],
+        }
+        input_rules InputRules { ordered_marker: input }
+    }
+}
+
+pub fn ordered_list() -> Plugin<Config> {
     let mut attrs = AttrSpecs::from([(
         "start".into(),
         AttrSpec::with_default(AttrType::Integer, Value::from(1)),
@@ -38,7 +47,7 @@ pub fn ordered_list() -> Plugin {
         "type".into(),
         AttrSpec::with_default(AttrType::NullableString, Value::Null),
     );
-    Plugin::new("orderedList", |p| {
+    Plugin::<Config>::new("orderedList", |p| {
         list_container(p, "orderedList", attrs);
         p.command::<Wrap>(|ctx, args| {
             wrap_list(
@@ -48,7 +57,7 @@ pub fn ordered_list() -> Plugin {
                 &list_attrs(args.start, args.list_type),
             )
         });
-        p.input_rule(list_input_rule(
+        p.input_rules().ordered_marker().set(list_input_rule(
             "orderedList",
             "listItem",
             r"^(\d+)\.\s$",
@@ -67,7 +76,6 @@ pub fn ordered_list() -> Plugin {
                 &list_attrs(args.start, args.list_type),
             )
         });
-        p.shortcut("Mod-Shift-7", Toggle::default());
     })
 }
 

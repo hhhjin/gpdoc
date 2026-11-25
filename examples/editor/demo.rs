@@ -89,22 +89,20 @@ fn editor_config() -> gpdoc::EditorConfig {
     use gpdoc_plugin_slash_command::slash_commands;
 
     gpdoc::EditorConfig::builder()
-        .plugins([
-            gpdoc_plugin_paragraph::paragraph(),
-            gpdoc_plugin_bold::bold(),
-            gpdoc_plugin_italic::italic(),
-            gpdoc_plugin_underline::underline(),
-            gpdoc_plugin_strike::strike(),
-            gpdoc_plugin_hard_break::hard_break(),
-            gpdoc_plugin_bullet_list::bullet_list(),
-            gpdoc_plugin_ordered_list::ordered_list(),
-            gpdoc_plugin_list_keymap::list_keymap(),
-            gpdoc_plugin_horizontal_rule::horizontal_rule(),
-            gpdoc_plugin_subscript::subscript(),
-            gpdoc_plugin_superscript::superscript(),
-            gpdoc_plugin_task_list::task_list(),
-            gpdoc_plugin_image::image(),
-        ])
+        .plugin(gpdoc_plugin_paragraph::paragraph())
+        .plugin(gpdoc_plugin_bold::bold())
+        .plugin(gpdoc_plugin_italic::italic())
+        .plugin(gpdoc_plugin_underline::underline())
+        .plugin(gpdoc_plugin_strike::strike())
+        .plugin(gpdoc_plugin_hard_break::hard_break())
+        .plugin(gpdoc_plugin_bullet_list::bullet_list())
+        .plugin(gpdoc_plugin_ordered_list::ordered_list())
+        .plugin(gpdoc_plugin_list_keymap::list_keymap())
+        .plugin(gpdoc_plugin_horizontal_rule::horizontal_rule())
+        .plugin(gpdoc_plugin_subscript::subscript())
+        .plugin(gpdoc_plugin_superscript::superscript())
+        .plugin(gpdoc_plugin_task_list::task_list())
+        .plugin(gpdoc_plugin_image::image())
         .plugin(gpdoc_plugin_mathematics::mathematics().with_view(|| {
             gpdoc_plugin_mathematics::formula_content().node_format("blockMath", |_, format| {
                 format.alignment = gpdoc_core::TextAlignment::Center;

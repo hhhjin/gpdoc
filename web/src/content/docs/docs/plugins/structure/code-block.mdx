@@ -17,21 +17,67 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 cargo add gpdoc-plugin-code-block
 ```
 
-Register `code_block()` with `paragraph()` so users can switch from code back to body text.
+## Example
 
-## Convert a paragraph to Rust code
-
-In a [Quickstart project](/docs/quickstart/), convert a paragraph to a Rust code block.
+Register code blocks alongside paragraphs so a block can switch between code and body text. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node, Value};
-use gpdoc_plugin_code_block::{Language, code_block};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_code_block::{code_block, code_block_body};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(code_block())
-    .build()?;
+    .plugin(code_block().with_view(code_view))
+    .build()
+    .expect("configure editor");
+
+fn code_view() -> ViewPlugin {
+    code_block_body(|block, _, _| block.content)
+}
+```
+
+At the start of a paragraph, type `~~~rust` and press **Space**. The editor turns the paragraph into a Rust code block.
+
+## Compose a code block
+
+The renderer receives the code block and its editable source. Keep labels outside the source so they stay out of the document.
+
+### Anatomy
+
+```text
+code_block_body(...)
+└── div()              Your wrapper
+    ├── label          Language read from the code block
+    └── block.content  Editable source text
+```
+
+### Show the language above the source
+
+Replace `code_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn code_view() -> ViewPlugin {
+    code_block_body(|block, _, _| {
+        let language = block.node.attrs.get("language")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Plain text")
+            .to_owned();
+        div().child(language).child(block.content)
+    })
+}
+```
+
+Place a language label above the editable source. A code block with no language displays “Plain text”.
+
+## Convert a paragraph to Rust code
+
+```rust
+use gpdoc::{Editor, Node, Value};
+use gpdoc_plugin_code_block::Language;
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "fn main() {}")])?;
 editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
 
@@ -77,28 +123,6 @@ editor.run(gpdoc_plugin_code_block::Toggle(Language::Keep))?;
 ## Start a code block while typing
 
 Start a paragraph with three backticks or three tildes and press Space. To choose a language, type a lowercase name after the fence, as in `~~~rust`, then press Space. The input rule consumes the fence. To color the source, see [Code block with syntax highlighting](/docs/plugins/structure/code-block-lowlight/).
-
-## Compose a GPUI view
-
-Code blocks display editable lines using the editor’s typography by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(code_block().with_view(views::code))
-```
-
-In `views.rs`, place the editable content once. Read `block.node.attrs["language"]` when displaying the language of a code block.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_code_block::code_block_body;
-use gpui::{div, prelude::*, px};
-
-pub fn code() -> ViewPlugin {
-    code_block_body(|block, _, _| {
-        div().font_family("monospace").p(px(8.)).child(block.content)
-    })
-}
-```
 
 ## Source code
 

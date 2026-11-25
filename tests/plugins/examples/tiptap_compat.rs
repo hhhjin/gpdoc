@@ -51,9 +51,9 @@ fn section_title(level: Level, article: bool) -> Plugin {
         });
         if article {
             p.command::<ApplyTitle>(|ctx, _| ctx.plan(SetSectionTitle));
-            p.shortcut("F7", ApplyTitle);
+            p.shortcut(gpdoc_plugin::key!("F7"), ApplyTitle);
         } else {
-            p.shortcut("Mod-Shift-2", SetSectionTitle);
+            p.shortcut(gpdoc_plugin::key!("Mod-Shift-2"), SetSectionTitle);
         }
     })
 }
@@ -224,11 +224,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     let mut results = Vec::new();
     for case in cases {
-        let mut plugins = vec![paragraph()];
+        let mut plugins = vec![paragraph().into()];
         for plugin in &case.plugins {
             let entry = match plugin.as_str() {
                 "ListKit" => {
-                    plugins.extend(gpdoc_plugin_list_kit::list_kit());
+                    plugins.extend([
+                        Plugin::from(bullet_list()),
+                        Plugin::from(list_item()),
+                        Plugin::from(gpdoc_plugin_list_keymap::list_keymap()),
+                        Plugin::from(ordered_list()),
+                        Plugin::from(gpdoc_plugin_task_list::task_item()),
+                        Plugin::from(gpdoc_plugin_task_list::task_list()),
+                    ]);
                     continue;
                 }
                 "TextStyleKit" => {
@@ -241,23 +248,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 "SectionTitle" => section_title(Level::H2, false),
                 "ArticleTitle" => section_title(Level::H3, true),
-                "Subscript" => subscript(),
-                "Superscript" => superscript(),
-                "Strike" => strike(),
-                "Underline" => underline(),
-                "HardBreak" => hard_break(),
-                "HorizontalRule" => horizontal_rule(),
-                "Heading" => heading(),
-                "Blockquote" => blockquote(),
-                "CodeBlock" => code_block(),
-                "ListItem" => list_item(),
-                "BulletList" => bullet_list(),
-                "OrderedList" => ordered_list(),
-                "Bold" => bold(),
-                "Italic" => italic(),
-                "Link" => link(Default::default()),
-                "InlineCode" => inline_code(),
-                "Highlight" => highlight(),
+                "Subscript" => subscript().into(),
+                "Superscript" => superscript().into(),
+                "Strike" => strike().into(),
+                "Underline" => underline().into(),
+                "HardBreak" => hard_break().into(),
+                "HorizontalRule" => horizontal_rule().into(),
+                "Heading" => heading().into(),
+                "Blockquote" => blockquote().into(),
+                "CodeBlock" => code_block().into(),
+                "ListItem" => list_item().into(),
+                "BulletList" => bullet_list().into(),
+                "OrderedList" => ordered_list().into(),
+                "Bold" => bold().into(),
+                "Italic" => italic().into(),
+                "Link" => link(Default::default()).into(),
+                "InlineCode" => inline_code().into(),
+                "Highlight" => highlight().into(),
                 name => blocks::plugin(name)
                     .or_else(|| document::plugin(name))
                     .or_else(|| structure::plugin(name))

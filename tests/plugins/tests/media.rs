@@ -3,10 +3,8 @@ use gpdoc_plugin::prelude::{Attrs, ContentRef, DocPos, Node, Selection};
 #[test]
 fn mention_suggestion_replaces_text_and_leaves_one_space_after_an_emoji() {
     let config = gpdoc_plugin::core::EditorConfig::builder()
-        .plugins([
-            gpdoc_plugin_paragraph::paragraph(),
-            gpdoc_plugin_mention::mention(),
-        ])
+        .plugin(gpdoc_plugin_paragraph::paragraph())
+        .plugin(gpdoc_plugin_mention::mention())
         .build()
         .unwrap();
     let input = "😀 @민수 next";

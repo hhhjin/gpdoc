@@ -19,21 +19,29 @@ cargo add gpdoc-plugin-horizontal-rule
 
 In a GPUI editor, the default view draws the divider.
 
-Register `horizontal_rule()` and `paragraph()` in the same config. The divider has no attributes or children. The paragraph supplies a place to continue typing after it.
+## Example
 
-## Insert a divider before a paragraph
-
-In a [Quickstart project](/docs/quickstart/), insert a divider at the start of a paragraph.
+Register a paragraph alongside the divider so the caret has a place to continue typing. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_horizontal_rule::horizontal_rule;
+use gpdoc::EditorConfig;
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_horizontal_rule::horizontal_rule;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(horizontal_rule())
-    .build()?;
+    .build()
+    .expect("configure editor");
+```
+
+At the start of a paragraph, type `---`. The editor inserts the divider and puts the caret in a paragraph.
+
+## Insert a divider before a paragraph
+
+```rust
+use gpdoc::{Editor, Node};
+
 let next_section = Node::text("paragraph", "Next section");
 let mut editor = Editor::from_document(&config, vec![next_section.clone()])?;
 editor.run(gpdoc_plugin_horizontal_rule::Set)?;

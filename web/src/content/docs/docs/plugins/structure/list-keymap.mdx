@@ -19,21 +19,31 @@ cargo add gpdoc-plugin-list-keymap
 
 ## Example
 
-This example uses a bullet list. Add `gpdoc-plugin-bullet-list` and `gpdoc-plugin-list-item` to your [Quickstart project](/docs/quickstart/). Put the caret at the start of the first item and run the Backspace command.
+Add `gpdoc-plugin-list-item` and `gpdoc-plugin-bullet-list` to the [Quickstart app](/docs/quickstart/#configure-the-editor) to use the list shortcuts with bullet items.
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
-use gpdoc_plugin_bullet_list::bullet_list;
-use gpdoc_plugin_list_item::list_item;
-use gpdoc_plugin_list_keymap::list_keymap;
+use gpdoc::EditorConfig;
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_list_item::list_item;
+use gpdoc_plugin_bullet_list::bullet_list;
+use gpdoc_plugin_list_keymap::list_keymap;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(list_item())
     .plugin(bullet_list())
     .plugin(list_keymap())
-    .build()?;
+    .build()
+    .expect("configure editor");
+```
+
+Create a bullet list, place the caret at the beginning of its first item, and press **Backspace**. The editor lifts the item into a paragraph.
+
+## Lift the first item with Backspace
+
+```rust
+use gpdoc::{DocPos, Editor, Node, Selection};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "First item")])?;
 editor.run(gpdoc_plugin_bullet_list::Toggle)?;
 editor.select(Selection::caret(DocPos(3)))?;
@@ -44,7 +54,7 @@ assert_eq!(editor.document().blocks()[0].kind, "paragraph");
 
 ## Settings
 
-`gpdoc_plugin_list_keymap::list_keymap()` takes no options. Register it alongside the list types you use. [List kit](/docs/plugins/structure/list-kit/) includes both the keymap and the standard list types.
+`gpdoc_plugin_list_keymap::list_keymap()` takes no options. Register it alongside the list types you use. See [Combine list plugins](/docs/lists/) for an example with bullet, ordered, and task lists.
 
 ## Commands
 

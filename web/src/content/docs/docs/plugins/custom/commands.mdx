@@ -30,7 +30,7 @@ pub fn snippets() -> Plugin {
             let range = anchor.min(head)..anchor.max(head);
             Ok(Some(ctx.one_step(Edit::ReplaceText { range, text })))
         });
-        p.shortcut("Mod-Alt-j", InsertSnippet { text: "Hi!".to_owned() });
+        p.shortcut(gpdoc_plugin::key!("Mod-Alt-j"), InsertSnippet { text: "Hi!".to_owned() });
     })
 }
 ```

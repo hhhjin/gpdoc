@@ -39,11 +39,20 @@ impl Command for Toggle {
     const NAME: &'static str = "toggleCodeBlock";
 }
 
-pub fn code_block() -> Plugin {
-    Plugin::new("codeBlock", register_code_block)
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        shortcuts {
+            toggle: Toggle(Language::Keep) => ["Mod-Alt-c"],
+        }
+        input_rules InputRules { fence: input }
+    }
 }
 
-pub fn register_code_block(p: &mut PluginSpec) {
+pub fn code_block() -> Plugin<Config> {
+    Plugin::<Config>::new("codeBlock", register_code_block)
+}
+
+fn register_code_block(p: &mut PluginSpec<Config>) {
     p.node(
         NodeSpec::block("codeBlock")
             .group("block")
@@ -66,8 +75,7 @@ pub fn register_code_block(p: &mut PluginSpec) {
     });
     p.command::<Set>(|ctx, command| set_node("codeBlock", Attrs::new())(ctx, command.0.attrs()));
     p.command::<Toggle>(|ctx, command| toggle_node("codeBlock")(ctx, command.0.attrs()));
-    p.shortcut("Mod-Alt-c", Toggle(Language::Keep));
-    p.input_rule(textblock_type_input_rule(
+    p.input_rules().fence().set(textblock_type_input_rule(
         Regex::new(r"^(?:```|~~~)([a-z]+)?\s$").expect("valid code fence"),
         "paragraph",
         "codeBlock",

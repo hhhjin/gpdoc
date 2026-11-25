@@ -93,7 +93,13 @@ fn audio_label(attrs: &Attrs) -> String {
     }
 }
 
-pub fn audio(options: AudioOptions) -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        paste_rules PasteRules { audio_url: paste }
+    }
+}
+
+pub fn audio(options: AudioOptions) -> Plugin<Config> {
     let mut attrs = AttrSpecs::from([
         (
             "src".into(),
@@ -125,15 +131,17 @@ pub fn audio(options: AudioOptions) -> Plugin {
         r"(?i)https?://[^\s]+?\.(?:mp3|wav|ogg|oga|flac|m4a|aac|opus|weba|webm)(?:\?[^\s]*)?",
     )
     .unwrap();
-    let plugin = Plugin::new("audio", |p| {
+    let plugin = Plugin::<Config>::new("audio", |p| {
         p.node(atom("audio", options.placement, attrs));
         p.atom_label("audio", audio_label);
-        p.paste_rule(gpdoc_plugin::atom::atom_paste_rule("audio", paste, |m| {
-            Some((
-                0,
-                [("src".into(), Value::String(m.get(0)?.as_str().into()))].into(),
-            ))
-        }));
+        p.paste_rules()
+            .audio_url()
+            .set(gpdoc_plugin::atom::atom_paste_rule("audio", paste, |m| {
+                Some((
+                    0,
+                    [("src".into(), Value::String(m.get(0)?.as_str().into()))].into(),
+                ))
+            }));
 
         p.command::<Set>(move |ctx, args| {
             let src = &args.src;

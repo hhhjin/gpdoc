@@ -2,7 +2,7 @@ use super::*;
 use crate::{AllowedMarks, ContentSpec, MarkSpec, NodeSpec, plugin::Plugin};
 
 fn fixture(extra_nodes: Vec<NodeSpec>, marks: Vec<MarkSpec>) -> EditorConfig {
-    let plugin = Plugin::new("fixture", |spec| {
+    let plugin: Plugin = Plugin::new("fixture", |spec| {
         spec.node(
             NodeSpec::block("p")
                 .group("block")
@@ -384,7 +384,7 @@ fn pending_draft_does_not_restore_a_cursor_that_has_moved() {
 #[test]
 fn break_handlers_follow_container_depth_and_can_decline() {
     use crate::plugin::Plugin;
-    let types = Plugin::new("blocks", |p| {
+    let types: Plugin = Plugin::new("blocks", |p| {
         p.node(NodeSpec::block("p").group("block").content("text*"));
         p.node(NodeSpec::block("inner").group("block").content("p+"));
         p.node(NodeSpec::block("outer").group("block").content("inner+"));

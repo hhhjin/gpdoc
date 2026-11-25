@@ -41,7 +41,6 @@ export const pluginGroups = [
       "structure/bullet-list",
       "structure/list-item",
       "structure/list-keymap",
-      "structure/list-kit",
       "structure/ordered-list",
       "structure/table",
       "structure/task-list",

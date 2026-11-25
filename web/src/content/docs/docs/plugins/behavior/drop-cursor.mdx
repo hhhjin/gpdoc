@@ -11,22 +11,23 @@ Drag a paragraph by its handle. Move it between the other paragraphs to see the 
 
 <ViewPluginExample plugin="drop-cursor" title="Drop cursor example" />
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-drop-cursor
 ```
 
+## Example
+
 ```rust
-use gpdoc_plugin_drop_cursor::drop_cursor;
+use gpdoc_plugin_drop_cursor::{drop_cursor, paint_drop_cursor};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(drop_cursor())
-    .build()?;
+    .plugin(drop_cursor().with_view(paint_drop_cursor))
+    .build()
+    .expect("configure editor");
 ```
 
 The painter receives the measured insertion bounds, window, and app. For a custom color, pass `|bounds, window, _| window.paint_quad(gpui::fill(bounds, gpui::rgb(0x4263eb)))` to `.with_view(...)`.

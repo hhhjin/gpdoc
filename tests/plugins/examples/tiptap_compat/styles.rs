@@ -12,7 +12,7 @@ pub fn plugin(name: &str) -> Option<Plugin> {
         "FontFamily" => font_family(),
         "FontSize" => font_size(),
         "LineHeight" => line_height(),
-        "TextAlign" => text_align(["paragraph", "heading"]),
+        "TextAlign" => text_align(["paragraph", "heading"]).into(),
         _ => return None,
     })
 }

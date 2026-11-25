@@ -133,7 +133,7 @@ mod tests {
     fn matches_queries_at_utf16_offsets_and_honors_prefixes() {
         let editor = gpdoc_plugin::core::Editor::from_document(
             &gpdoc_plugin::core::EditorConfig::builder()
-                .plugins([gpdoc_plugin_paragraph::paragraph()])
+                .plugin(gpdoc_plugin_paragraph::paragraph())
                 .build()
                 .unwrap(),
             vec![Node::text("paragraph", "😀 @한글 x@y")],

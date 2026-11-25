@@ -9,7 +9,7 @@ Import `gpdoc_plugin::EditorConfig` to build a headless editor with the plugin t
 
 ## Plugin declarations
 
-`Plugin::new(name, declare)` calls `declare` with a mutable `PluginSpec`. Register as many nodes, marks, or commands as the feature needs. Options are ordinary arguments to the function that constructs the plugin. An independent preset can return a `Vec<Plugin>`.
+`Plugin::new(name, declare)` calls `declare` with a mutable `PluginSpec`. Register as many nodes, marks, or commands as the feature needs. Options are ordinary arguments to the function that constructs the plugin. An independent preset can return a `Vec<Plugin>`. A factory returning `Plugin` uses `()` for its shortcut type. When declaring a local plugin without a factory return type, use `let plugin: Plugin = Plugin::new(...)`.
 
 ```rust
 use gpdoc::EditorConfig;
@@ -69,18 +69,26 @@ impl Command for InsertGreeting {
     const NAME: &'static str = "insertGreeting";
 }
 
-fn greetings() -> Plugin {
-    Plugin::new("greetings", |p| {
+plugin_shortcuts! {
+    pub GreetingShortcuts {
+        insert: InsertGreeting { text: "Hello".to_owned() } => ["Mod-Alt-g"],
+    }
+}
+
+fn greetings(add_alias: bool) -> Plugin<GreetingShortcuts> {
+    Plugin::<GreetingShortcuts>::new("greetings", |p| {
+        if add_alias {
+            p.shortcuts().insert().add(key!("F6"));
+        }
         p.command::<InsertGreeting>(|ctx, InsertGreeting { text }| {
             let range = ctx.selection().bounds(ctx.document());
             Ok(Some(ctx.one_step(Edit::ReplaceText { range, text })))
         });
-        p.shortcut("Mod-Alt-g", InsertGreeting { text: "Hello".to_owned() });
     })
 }
 ```
 
-Use `editor.run(command)` to execute a command. The config validates shortcut names such as `Enter`, `Shift-Tab`, and `Mod-Alt-g`.
+Use `editor.run(command)` to execute a command. Use `key!("Mod-Alt-g")` for a compile-time checked literal. For a user preference, parse its string into a `Shortcut` and handle the parse error.
 
 | Handler result | Effect |
 | --- | --- |
@@ -88,7 +96,90 @@ Use `editor.run(command)` to execute a command. The config validates shortcut na
 | `Ok(None)` | The command is inapplicable. Keyboard dispatch can try the next matching binding. |
 | `Err(error)` | The editor discards the pending edit and reports the error. |
 
-## Input and transaction hooks
+### Customize a plugin's shortcuts
+
+`Plugin<YourShortcuts>` starts with the defaults for `YourShortcuts`.
+Both `Plugin::new` and `extend` pass the same typed settings to the closure.
+For example, a plugin can add an alias during construction, and an app can
+remove that alias before installation.
+
+```rust
+use gpdoc_plugin::key;
+use gpdoc_plugin_bold::bold;
+use gpdoc_plugin_hard_break::hard_break;
+use gpdoc_plugin_heading::{Level, heading};
+
+let bold = bold().extend(|p| p.shortcuts().toggle().set(key!("Mod-Alt-b")));
+let breaks = hard_break().extend(|p| p.shortcuts().insert().remove(key!("Mod-Enter")));
+let headings = heading().extend(|p| p.shortcuts().toggle(Level::H2).disable());
+```
+
+`set` replaces the action's keys. `add` adds an alias, `remove` drops one key,
+and `disable` clears all keys for that action. Extensions run in order.
+Install each result with `.plugin(...)`. For a heterogeneous `Vec<Plugin>`,
+call `.into()` on each configured plugin. To customize its GPUI view as well,
+call `.with_view(...)` after `.extend(...)`.
+
+Two actions on the same plugin must use distinct keys. Different plugins can
+share a key and fall through when a command does not apply.
+
+A plugin author can use `plugin_shortcuts!` as in the greeting example above.
+It generates an accessor for each declared action, so an app can write
+`greetings(true).extend(|p| p.shortcuts().insert().remove(key!("F6")))`.
+
+## Customize input rules, paste rules, and transaction hooks
+
+A plugin exposes each configurable handler by name. For example, an app can
+keep `__text__` literal while typing and still turn it into bold text on paste.
+
+```rust
+let bold = gpdoc_plugin_bold::bold().extend(|p| {
+    p.input_rules().double_underscore().disable();
+});
+```
+
+Declare the public names with `plugin_config!`. Each entry generates a Rust
+method whose `set` accepts the handler type for that entry. Use the same
+method to install a default in `Plugin::new` or replace it in `extend`.
+
+```rust
+use gpdoc_plugin::prelude::*;
+
+plugin_config! {
+    pub SizeConfig {
+        hooks SizeHooks { limit: filter }
+    }
+}
+
+fn size_limit(max: usize) -> Plugin<SizeConfig> {
+    Plugin::<SizeConfig>::new("sizeLimit", |p| {
+        p.hooks().limit().set(move |change| Ok(change.document.size() <= max));
+    })
+}
+
+let limit = size_limit(80).extend(|p| p.hooks().limit().disable());
+```
+
+| Group | Entry kind | Handler result |
+| --- | --- | --- |
+| `input_rules` | `input` or `mark("bold")` | Return optional edits. A matching mark rule also clears that mark for subsequent typing. |
+| `paste_rules` | `handle_paste` | Inspect the clipboard text before insertion and optionally supply a transaction. |
+| `paste_rules` | `paste` | Return edits for the inserted paste range. |
+| `hooks` | `append` | Return follow-up edits for the proposed document. |
+| `hooks` | `filter` | Return whether to accept the proposed document. |
+
+A config can include a `shortcuts { ... }` section first, followed by any
+of these groups. For example, Bold declares
+`input_rules InputRules { double_underscore: mark("bold"), double_asterisk: mark("bold") }`
+and exposes the same delimiters in `paste_rules`. Each group is independent.
+Within one phase, the first registration fixes a handler's position. Calling
+`set` again replaces it in place, even after `disable`. Extensions run in
+call order. The editor installs only the handlers enabled at build time.
+
+## Register internal handlers
+
+Use the following methods for handlers without a public configuration name.
+For example, the table plugin uses an internal append handler to repair its grid.
 
 | Method | Contract |
 | --- | --- |
@@ -120,7 +211,7 @@ A transaction belongs to the editor and draft it came from. Applying one from an
 
 | Module | Operations |
 | --- | --- |
-| `gpdoc_plugin::marks` | `FormattingMark` defines a mark with set, unset, and toggle command values, an optional shortcut, and delimiter rules. Use `set_mark`, `unset_mark`, or `toggle_mark` for custom handlers. |
+| `gpdoc_plugin::marks` | `register_formatting_mark::<Set, Unset, Toggle>(p, kind)` registers an attribute-free mark and its three commands inside `Plugin::new`. `delimited_mark_input` and `delimited_mark_paste` build handlers for a single delimiter. Use `set_mark`, `unset_mark`, or `toggle_mark` for custom handlers. |
 | `gpdoc_plugin::textblock` | Set or toggle the text block type and declare a text block input rule. |
 | `gpdoc_plugin::atom` | Declare and insert leaf nodes and build input or paste rules for them. |
 | `gpdoc_plugin::selection` | Find selected blocks, a node path, or the document range of the selection. |

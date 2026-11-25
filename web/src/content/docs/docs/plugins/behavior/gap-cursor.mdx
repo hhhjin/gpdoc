@@ -11,22 +11,23 @@ Click halfway between the two horizontal rules. A short blue line marks the gap.
 
 <ViewPluginExample plugin="gap-cursor" title="Gap cursor example" />
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-gap-cursor
 ```
 
+## Example
+
 ```rust
-use gpdoc_plugin_gap_cursor::gap_cursor;
+use gpdoc_plugin_gap_cursor::{gap_cursor, paint_gap_cursor};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(gap_cursor())
-    .build()?;
+    .plugin(gap_cursor().with_view(paint_gap_cursor))
+    .build()
+    .expect("configure editor");
 ```
 
 To draw a different marker, pass a painter to `.with_view(...)` taking `Bounds<Pixels>`, `&mut Window`, and `&mut App`. The plugin locates the boundary and handles keyboard and pointer navigation.

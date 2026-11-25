@@ -19,17 +19,59 @@ cargo add gpdoc-plugin-paragraph
 
 Register `paragraph()` in your editor configuration. This makes `paragraph` the default text block. It has no attributes and accepts zero or more inline children.
 
-## Open a document with one paragraph
+## Example
 
-Open a document with one paragraph in your [Quickstart project](/docs/quickstart/).
+Register the paragraph as the default text block. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_paragraph::paragraph;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_paragraph::{paragraph, paragraph_block};
 
 let config = EditorConfig::builder()
-    .plugin(paragraph())
-    .build()?;
+    .plugin(paragraph().with_view(paragraph_view))
+    .build()
+    .expect("configure editor");
+
+fn paragraph_view() -> ViewPlugin {
+    paragraph_block(|block, _, _| block.content)
+}
+```
+
+Type a few words, press **Enter**, and continue typing in a second paragraph.
+
+## Compose a paragraph
+
+The editor supplies the paragraph contents as a single element. Place that element once in your own wrapper.
+
+### Anatomy
+
+```text
+paragraph_block(...)
+└── div()              Your wrapper
+    └── block.content  Editable text, marks, and inline nodes
+```
+
+### Wrap the editable paragraph
+
+Replace `paragraph_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn paragraph_view() -> ViewPlugin {
+    paragraph_block(|block, _, _| {
+        div().child(block.content)
+    })
+}
+```
+
+## Open a document with one paragraph
+
+With the configuration above, open a document with an initial paragraph.
+
+```rust
+use gpdoc::{Editor, Node};
+
 let block = Node::text("paragraph", "Write here.");
 let mut editor = Editor::from_document(&config, vec![block.clone()])?;
 assert_eq!(editor.document().blocks(), &[block]);
@@ -52,28 +94,6 @@ editor.run(gpdoc_plugin_paragraph::Set)?;
 | Shortcut | Action |
 | --- | --- |
 | **Mod + Alt + 0** | Convert selected text blocks to paragraphs. |
-
-## Compose a GPUI view
-
-Paragraphs inherit the editor’s typography by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(paragraph().with_view(views::paragraph))
-```
-
-In `views.rs`, place the editable content once. The wrapper sets the base typography for its editable text.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_paragraph::paragraph_block;
-use gpui::{div, prelude::*, px};
-
-pub fn paragraph() -> ViewPlugin {
-    paragraph_block(|block, _, _| {
-        div().text_size(px(16.)).line_height(px(26.)).child(block.content)
-    })
-}
-```
 
 ## Source code
 

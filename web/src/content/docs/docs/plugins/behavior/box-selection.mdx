@@ -13,27 +13,52 @@ Press in the left margin beside “Draft the outline”. Hold the mouse button a
 
 Start the drag outside all blocks. Inside a paragraph, even the blank space after the last character uses normal text selection. The box selects whole top-level blocks, including an entire list or table when it intersects one.
 
-## Register the plugin
+## Install
 
 ```sh
 cargo add gpdoc-plugin-box-selection
 ```
 
+## Example
+
 ```rust
-use gpdoc_plugin_box_selection::box_selection;
+use gpdoc_plugin_box_selection::{box_selection, selection_box};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(box_selection())
-    .build()?;
+    .plugin(box_selection().with_view(selection_box))
+    .build()
+    .expect("configure editor");
 ```
 
 Use `EditorSurface::layout` to leave space between the editable document and the edge of the surface. A drag starting in this space can select blocks. The [page layout example](/docs/quickstart/#place-the-document-in-a-page) centers the document and leaves a gutter on both sides.
 
-Pass a renderer to `.with_view(...)` with the signature `fn(Bounds<Pixels>, &mut Window, &mut App) -> gpui::Div` to change the rectangle. The plugin positions and sizes the overlay and updates the block selection.
-
 For keyboard-based block selection, also register [Node range](/docs/plugins/behavior/node-range/).
+
+## Compose the selection rectangle
+
+### Anatomy
+
+```text
+box_selection().with_view(...)  Tracks the drag and selects intersecting blocks
+└── bounds                      Position and size of the rectangle in the window
+    └── selection_box(...)      Fills the rectangle with the default overlay
+```
+
+### Add a label to the rectangle
+
+Replace `selection_box` in the example with this renderer. It keeps the default rectangle and adds a label while the drag is in progress.
+
+```rust
+use gpui::{App, Bounds, Div, Pixels, Window, prelude::*};
+
+fn labeled_box(bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) -> Div {
+    selection_box(bounds, window, cx).child("Select blocks")
+}
+```
+
+Release the mouse to hide the rectangle and keep the intersecting blocks selected.
 
 ## Source code
 

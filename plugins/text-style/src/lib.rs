@@ -424,7 +424,7 @@ mod tests {
     fn color_can_target_a_custom_set_of_nodes_and_marks() {
         let types = ["paragraph", "textStyle", "heading"];
         let plugins = [
-            gpdoc_plugin_paragraph::paragraph(),
+            gpdoc_plugin_paragraph::paragraph().into(),
             text_style(),
             StyleProperty::Color.on(types),
         ];

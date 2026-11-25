@@ -13,48 +13,82 @@ Click the empty paragraph and type `/h1`. Press **Enter**, then type a title in 
 
 <ViewPluginExample plugin="slash-command" title="Slash command example" />
 
-## Register your commands
+## Install
 
-Register `slash_commands(entries)` to use the default GPUI list. The default menu displays matching command labels and marks the active row. Each item binds a command supplied by another plugin. This example adds a heading command to the [Quickstart editor](/docs/quickstart/#configure-the-editor).
+```sh
+cargo add gpdoc-plugin-slash-command gpdoc-plugin-heading
+```
+
+## Example
+
+Register a slash command that turns the current paragraph into a heading. Render its label with the picker's built-in list in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc_plugin_heading::{heading, Level, Set};
+use gpdoc::{EditorConfig, PluginViewExt, StoredCommand, ViewPlugin};
+use gpdoc_plugin_heading::{Level, Set, heading};
 use gpdoc_plugin_paragraph::paragraph;
-use gpdoc_plugin_slash_command::{SlashCommand, slash_commands};
+use gpdoc_plugin_slash_command::{SlashCommand, SlashMenu, slash_commands, slash_picker};
 
 let entries = [SlashCommand {
     id: "heading.h1",
     label: "Heading 1",
     aliases: &["h1"],
-    command: gpdoc::StoredCommand::new(Set(Level::H1)),
+    command: StoredCommand::new(Set(Level::H1)),
 }];
 
-let config = gpdoc::EditorConfig::builder()
+let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(heading())
-    .plugin(slash_commands(entries))
-    .build()?;
+    .plugin(slash_commands(entries).with_view(heading_menu))
+    .build()
+    .expect("configure editor");
+
+fn heading_menu() -> ViewPlugin {
+    slash_picker(|menu: SlashMenu, _, _| menu.labeled_list(|entry| entry.label.to_owned()))
+}
 ```
 
-To customize the menu, import `gpdoc::PluginViewExt`, declare `mod menus;`, and register `slash_commands(entries).with_view(menus::slash_menu)`. Put the view in `menus.rs`. The popover follows the caret. The list keeps the active item visible, and each row handles click-to-accept while the editor retains keyboard focus.
+Type `/h1` in an empty paragraph and press **Enter** to turn it into a level-one heading.
+
+## Compose a slash menu
+
+The picker filters the commands, tracks the active row, and handles arrow keys, Enter, and Escape.
+
+### Anatomy
+
+```text
+slash_picker(...)          Finds commands matching the typed label or alias
+└── menu.popover(...)      Anchors your list below the caret
+    └── menu.list(6, ...)  Keeps the active row within six visible matches
+        └── row.element()  Accepts the command on click and keeps editor focus
+```
+
+### Show a search alias beside each command
+
+Replace `heading_menu` in the example. Put the label and first alias inside the row's click target.
 
 ```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_slash_command::{SlashMenu, slash_picker};
-use gpui::{prelude::*, rgb};
+use gpui::prelude::*;
 
-pub fn slash_menu() -> ViewPlugin {
+fn heading_menu() -> ViewPlugin {
     slash_picker(|menu: SlashMenu, _, _| {
-        menu.popover(menu.list(6, |row| {
-            row.element()
-                .when(row.is_active(), |el| el.bg(rgb(0xdde9f8)))
-                .child(row.value.label)
-        }).bg(rgb(0xffffff)))
+        let list = menu.list(6, |row| {
+            let label = match row.value.aliases.first() {
+                Some(alias) => format!("{} /{alias}", row.value.label),
+                None => row.value.label.to_owned(),
+            };
+            row.element().child(label)
+        });
+        menu.popover(list)
     })
 }
 ```
 
-Type `/h1` and press Enter to apply the level-one heading. To contribute entries from a plugin, register its catalog with `PluginSpec::metadata(SlashCatalog::new(entries))`. Register `slash_commands([])` once to display the catalogs with the default list, or attach the same custom menu with `.with_view(menus::slash_menu)`.
+Type `/h1` and click the row labeled **Heading 1 /h1**. Use `row.is_active()` to identify the row that Enter will accept.
+
+## Add menu items from another plugin
+
+To contribute entries from a plugin, register its catalog with `PluginSpec::metadata(SlashCatalog::new(entries))`. Register `slash_commands([])` once to display the catalogs with the default list, or attach the same custom menu with `.with_view(heading_menu)`.
 
 ## Source code
 

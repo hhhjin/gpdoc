@@ -170,11 +170,9 @@ mod tests {
     #[test]
     fn outline_tracks_text_depth_and_stable_anchors() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                heading(),
-                table_of_contents_with(["heading"], str::to_owned),
-            ])
+            .plugin(paragraph())
+            .plugin(heading())
+            .plugin(table_of_contents_with(["heading"], str::to_owned))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

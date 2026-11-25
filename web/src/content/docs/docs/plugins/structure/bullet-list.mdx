@@ -19,19 +19,59 @@ cargo add gpdoc-plugin-bullet-list gpdoc-plugin-list-item
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), install and register `list_item()` with `bullet_list()`.
+Register the list container and the item type it accepts. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_bullet_list::bullet_list;
-use gpdoc_plugin_list_item::list_item;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_list_item::list_item;
+use gpdoc_plugin_bullet_list::{bullet_list, bullet_list_body};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(list_item())
-    .plugin(bullet_list())
-    .build()?;
+    .plugin(bullet_list().with_view(bullets_view))
+    .build()
+    .expect("configure editor");
+
+fn bullets_view() -> ViewPlugin {
+    bullet_list_body(|block, _, _| block.content)
+}
+```
+
+Type `-` followed by a space to start a bullet list.
+
+## Compose a bullet list
+
+Wrap the whole list with `bullet_list_body`. The [list item view](/docs/plugins/structure/list-item/#compose-a-list-item) supplies each bullet and its editable body.
+
+### Anatomy
+
+```text
+bullet_list_body(...)
+└── div()              Your wrapper
+    └── block.content  Editable items with their bullet markers
+```
+
+### Wrap the list items
+
+Replace `bullets_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn bullets_view() -> ViewPlugin {
+    bullet_list_body(|block, _, _| {
+        div().child(block.content)
+    })
+}
+```
+
+## Wrap a paragraph in a bullet list
+
+```rust
+use gpdoc::{Editor, Node};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Keep a changelog")])?;
 editor.run(gpdoc_plugin_bullet_list::Toggle)?;
 
@@ -67,28 +107,6 @@ editor.run(gpdoc_plugin_bullet_list::Wrap)?;
 | **Mod + Shift + 8** | `toggleBulletList` |
 
 At the start of a paragraph, type `-`, `+`, or `*` followed by a space. The input rule replaces the marker with a bullet.
-
-## Compose a GPUI view
-
-A bullet list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic bullet markers. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(bullet_list().with_view(views::bullets))
-```
-
-In `views.rs`, place the editable content once. Register the list item renderer to place a bullet beside each editable item.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_bullet_list::bullet_list_body;
-use gpui::{div, prelude::*, px};
-
-pub fn bullets() -> ViewPlugin {
-    bullet_list_body(|block, _, _| {
-        div().pl(px(16.)).child(block.content)
-    })
-}
-```
 
 ## Source code
 

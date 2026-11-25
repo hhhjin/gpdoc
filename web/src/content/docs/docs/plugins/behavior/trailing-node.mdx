@@ -19,7 +19,7 @@ Run this from a [Quickstart project](/docs/quickstart/).
 cargo add gpdoc-plugin-trailing-node
 ```
 
-## Keep a paragraph after a heading
+## Example
 
 For this example, add `gpdoc-plugin-heading` to the Quickstart project. Turning the final paragraph into a heading leaves a new empty paragraph after it.
 
@@ -33,7 +33,8 @@ let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(heading())
     .plugin(trailing_node())
-    .build()?;
+    .build()
+    .expect("configure editor");
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Release notes")])?;
 editor.run(gpdoc_plugin_heading::Set(gpdoc_plugin_heading::Level::H1))?;
 

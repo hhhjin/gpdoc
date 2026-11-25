@@ -16,12 +16,12 @@ Table of contents assigns stable IDs to nonempty headings. Use the outline's pos
 Run this from a [Quickstart project](/docs/quickstart/).
 
 ```sh
-cargo add gpdoc-plugin-table-of-contents
+cargo add gpdoc-plugin-table-of-contents gpdoc-plugin-heading
 ```
 
-## Read the outline for a document
+## Example
 
-This example indexes the default `heading` type. Add `gpdoc-plugin-heading` to the Quickstart project to run it. The first outline entry contains the heading text and its generated anchor.
+This example indexes the default `heading` type. The first outline entry contains the heading text and its generated anchor.
 
 ```rust
 use gpdoc::{Editor, EditorConfig, Node};
@@ -33,7 +33,8 @@ let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(heading())
     .plugin(table_of_contents())
-    .build()?;
+    .build()
+    .expect("configure editor");
 let editor = Editor::from_document(&config, vec![Node::text("heading", "Release notes")])?;
 
 let entries = headings(editor.document());

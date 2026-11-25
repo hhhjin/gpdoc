@@ -10,7 +10,13 @@ pub struct TypographyOptions {
     pub rtl_quotes: bool,
 }
 
-pub fn typography(options: TypographyOptions) -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        input_rules InputRules { substitutions: input }
+    }
+}
+
+pub fn typography(options: TypographyOptions) -> Plugin<Config> {
     let rules = [
         ("emDash", r"--$", "—"),
         ("ellipsis", r"\.\.\.$", "…"),
@@ -63,8 +69,8 @@ pub fn typography(options: TypographyOptions) -> Plugin {
         ))
     })
     .collect::<Vec<_>>();
-    Plugin::new("typography", |p| {
-        p.input_rule(move |ctx| {
+    Plugin::<Config>::new("typography", |p| {
+        p.input_rules().substitutions().set(move |ctx| {
             let Selection::Text { anchor, head } = ctx.selection else {
                 return Ok(None);
             };
@@ -103,7 +109,8 @@ mod tests {
     #[test]
     fn punctuation_matches_at_utf16_caret_and_preserves_context() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), typography(TypographyOptions::default())])
+            .plugin(paragraph())
+            .plugin(typography(TypographyOptions::default()))
             .build()
             .unwrap();
         let mut editor =

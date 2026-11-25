@@ -87,11 +87,17 @@ pub fn mention_label(attrs: &Attrs) -> String {
     format!("{}{}", trigger_text(attrs), label_text(attrs))
 }
 
-pub fn mention() -> Plugin {
+pub fn mention() -> Plugin<Shortcuts> {
     mention_with_backspace(false)
 }
 
-pub fn mention_with_backspace(delete_trigger: bool) -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        delete_backward: DeleteBackward => ["Backspace"],
+    }
+}
+
+pub fn mention_with_backspace(delete_trigger: bool) -> Plugin<Shortcuts> {
     let attrs = AttrSpecs::from([
         (
             "id".into(),
@@ -147,7 +153,6 @@ pub fn mention_with_backspace(delete_trigger: bool) -> Plugin {
                 text,
             })))
         });
-        p.shortcut("Backspace", DeleteBackward);
     })
     .priority(101);
     #[cfg(feature = "gpui")]

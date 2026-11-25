@@ -1,4 +1,6 @@
-use gpdoc_plugin::marks::{delimited_mark_rules, set_mark, toggle_mark, unset_mark};
+use gpdoc_plugin::marks::{
+    delimited_mark_input, delimited_mark_paste, set_mark, toggle_mark, unset_mark,
+};
 use gpdoc_plugin::prelude::{
     AttrSpec, AttrType, Attrs, Command, MarkSpec, Plugin, Value, unit_command,
 };
@@ -24,15 +26,25 @@ impl Command for Toggle {
 }
 unit_command!(pub Unset, "unsetHighlight");
 
-pub fn highlight() -> Plugin {
+pub fn highlight() -> Plugin<Config> {
     highlight_with(false)
 }
 
-pub fn multicolor_highlight() -> Plugin {
+pub fn multicolor_highlight() -> Plugin<Config> {
     highlight_with(true)
 }
 
-fn highlight_with(multicolor: bool) -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        shortcuts {
+            toggle: Toggle(None) => ["Mod-Shift-h"],
+        }
+        input_rules InputRules { double_equals: mark("highlight") }
+        paste_rules PasteRules { double_equals: paste }
+    }
+}
+
+fn highlight_with(multicolor: bool) -> Plugin<Config> {
     let mut spec = MarkSpec::new("highlight");
     if multicolor {
         spec.attrs.insert(
@@ -40,12 +52,16 @@ fn highlight_with(multicolor: bool) -> Plugin {
             AttrSpec::with_default(AttrType::NullableString, Value::Null),
         );
     }
-    let plugin = Plugin::new("highlight", |p| {
+    let plugin = Plugin::<Config>::new("highlight", |p| {
         p.mark(spec);
-        delimited_mark_rules(p, "highlight", &["=="]);
+        p.input_rules()
+            .double_equals()
+            .set(delimited_mark_input("highlight", "=="));
+        p.paste_rules()
+            .double_equals()
+            .set(delimited_mark_paste("highlight", "=="));
         p.command::<Set>(|ctx, command| set_mark("highlight")(ctx, attrs(command.0)));
         p.command::<Toggle>(|ctx, command| toggle_mark("highlight")(ctx, attrs(command.0)));
-        p.shortcut("Mod-Shift-h", Toggle(None));
         p.command::<Unset>(|ctx, _| unset_mark("highlight")(ctx, Attrs::new()));
     });
     #[cfg(feature = "gpui")]

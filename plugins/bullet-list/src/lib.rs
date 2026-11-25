@@ -4,18 +4,26 @@ use gpdoc_plugin_list_item::{list_container, list_input_rule, toggle_list, wrap_
 unit_command!(pub Wrap, "wrapInBulletList");
 unit_command!(pub Toggle, "toggleBulletList");
 
-pub fn bullet_list() -> Plugin {
-    Plugin::new("bulletList", |p| {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        shortcuts {
+            toggle: Toggle => ["Mod-Shift-8"],
+        }
+        input_rules InputRules { bullet_marker: input }
+    }
+}
+
+pub fn bullet_list() -> Plugin<Config> {
+    Plugin::<Config>::new("bulletList", |p| {
         list_container(p, "bulletList", AttrSpecs::new());
         p.command::<Wrap>(|ctx, _| wrap_list(ctx, "bulletList", "listItem", &Attrs::new()));
-        p.input_rule(list_input_rule(
+        p.input_rules().bullet_marker().set(list_input_rule(
             "bulletList",
             "listItem",
             r"^\s*([-+*])\s$",
             |_| Some((Attrs::new(), Attrs::new())),
         ));
         p.command::<Toggle>(|ctx, _| toggle_list(ctx, "bulletList", "listItem", &Attrs::new()));
-        p.shortcut("Mod-Shift-8", Toggle);
     })
 }
 

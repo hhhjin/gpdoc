@@ -24,6 +24,8 @@ pub use model::{
 pub use presentation::*;
 pub use serde_json::Value;
 pub use shortcut::Shortcut;
+#[doc(hidden)]
+pub use shortcut::ShortcutParts;
 pub use transform::{
     Affinity, Boundary, BoundaryEdit, Edit, MappedPosition, PositionMap, ReplaceAroundStep,
     ReplaceStep, Step,

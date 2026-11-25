@@ -19,7 +19,7 @@ Run this from a [Quickstart project](/docs/quickstart/).
 cargo add gpdoc-plugin-unique-id
 ```
 
-## Assign IDs to paragraphs
+## Example
 
 With the paragraph plugin installed, assign UUIDs to paragraphs when the document opens.
 
@@ -31,7 +31,8 @@ use gpdoc_plugin_unique_id::unique_id;
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(unique_id(["paragraph"]))
-    .build()?;
+    .build()
+    .expect("configure editor");
 let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Release notes")])?;
 let id = editor.document().blocks()[0].attrs.get("id");
 assert!(matches!(id, Some(Value::String(id)) if !id.is_empty()));

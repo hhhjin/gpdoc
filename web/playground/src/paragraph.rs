@@ -6,7 +6,9 @@ use wasm_bindgen::prelude::*;
 
 fn example_config() -> Result<EditorConfig, Error> {
     EditorConfig::builder()
-        .plugins([paragraph(), bold(), italic()])
+        .plugin(paragraph())
+        .plugin(bold())
+        .plugin(italic())
         .build()
 }
 

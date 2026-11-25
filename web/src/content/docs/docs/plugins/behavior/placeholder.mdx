@@ -11,22 +11,23 @@ Click the empty paragraph and type an update. Delete what you typed to see the h
 
 <ViewPluginExample plugin="placeholder" title="Placeholder example" />
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-placeholder
 ```
 
+## Example
+
 ```rust
-use gpdoc_plugin_placeholder::placeholder;
+use gpdoc_plugin_placeholder::{placeholder, paint_placeholder};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(placeholder("Write an update…"))
-    .build()?;
+    .plugin(placeholder("Write an update…").with_view(paint_placeholder))
+    .build()
+    .expect("configure editor");
 ```
 
 Pass your own painter to `.with_view(...)` to change the appearance. It receives a `PlaceholderHint` with the block position, first-line bounds, and first line of the hint text. Call `DecorationFrame::paint_text` to use the current editor font and line height.

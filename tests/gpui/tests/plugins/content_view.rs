@@ -343,7 +343,7 @@ fn custom_child_layout_uses_allocated_bounds_for_hit_testing_and_composition() {
                 }))
         })
     };
-    let spacer = Plugin::new("spacer", |p| {
+    let spacer: Plugin = Plugin::new("spacer", |p| {
         p.node(NodeSpec::block("spacer").group("block").content("block*"))
     });
     let config = EditorConfig::builder()

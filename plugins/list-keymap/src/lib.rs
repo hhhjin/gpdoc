@@ -9,16 +9,19 @@ unit_command!(pub Backspace, "listBackspace");
 unit_command!(pub Delete, "listDelete");
 unit_command!(pub Tab, "listTab");
 
-pub fn list_keymap() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        backspace: Backspace => ["Backspace", "Mod-Backspace"],
+        delete: Delete => ["Delete", "Mod-Delete"],
+        tab: Tab => ["Tab"],
+    }
+}
+
+pub fn list_keymap() -> Plugin<Shortcuts> {
     Plugin::new("listKeymap", |p| {
         p.command::<Backspace>(|ctx, _| join_items(ctx, false));
-        p.shortcut("Backspace", Backspace);
-        p.shortcut("Mod-Backspace", Backspace);
         p.command::<Delete>(|ctx, _| join_items(ctx, true));
-        p.shortcut("Delete", Delete);
-        p.shortcut("Mod-Delete", Delete);
         p.command::<Tab>(|ctx, _| tab_after_list(ctx));
-        p.shortcut("Tab", Tab);
     })
 }
 

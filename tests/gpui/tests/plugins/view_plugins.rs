@@ -49,6 +49,34 @@ impl ViewBehavior for PaintProbe {
 }
 
 #[test]
+fn extended_bold_uses_the_new_shortcut_in_the_focused_view() {
+    let bold = gpdoc_plugin_bold::bold()
+        .extend(|p| p.shortcuts().toggle().set(gpdoc::key!("F6")))
+        .with_view(gpdoc_plugin_bold::bold_format);
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(bold)
+        .build()
+        .unwrap();
+    let mut app = TestAppContext::single();
+    let (view, cx) = open_editor(&mut app, &config, DocumentSource::Empty);
+    cx.update(|window, cx| window.focus(&view.read(cx).focus_handle(cx)));
+    cx.simulate_input("Draft");
+    cx.simulate_keystrokes("secondary-a secondary-b");
+    cx.update(|_, cx| {
+        assert_eq!(
+            view.read(cx).editor().document().blocks(),
+            [Node::text("paragraph", "Draft")]
+        );
+    });
+    cx.simulate_keystrokes("f6");
+    cx.update(|_, cx| {
+        let block = &view.read(cx).editor().document().blocks()[0];
+        assert_eq!(block.child(0).marks()[0].kind, "bold");
+    });
+}
+
+#[test]
 fn editor_isolation() {
     let config = EditorConfig::builder()
         .plugin(paragraph())
@@ -307,7 +335,7 @@ fn decorations_menus_and_drop_handlers() {
     });
 }
 
-fn mention_picker() -> Plugin {
+fn mention_picker() -> Plugin<gpdoc_plugin_mention::Shortcuts> {
     use gpdoc_plugin_mention::{Mention, MentionCatalog, mention};
 
     mention().with_metadata(MentionCatalog::new([
@@ -401,7 +429,7 @@ fn contributed_slash_item_uses_the_installed_view_and_command() {
     };
     use gpui::prelude::*;
 
-    let contributed = gpdoc_plugin::Plugin::new("articleCommands", |spec| {
+    let contributed = gpdoc_plugin::Plugin::<()>::new("articleCommands", |spec| {
         spec.metadata(SlashCatalog::new([SlashCommand {
             id: "article.title",
             label: "Article title",
@@ -810,7 +838,7 @@ fn drag_to_block(
 fn named_root_blocks_can_be_reordered_without_a_block_group() {
     let config = EditorConfig::builder()
         .plugin(paragraph())
-        .plugin(gpdoc_plugin::Plugin::new("sections", |p| {
+        .plugin(gpdoc_plugin::Plugin::<()>::new("sections", |p| {
             p.node(gpdoc_core::NodeSpec::block("section").content("text*"));
             p.document_content("section+");
         }))
@@ -1350,7 +1378,7 @@ fn dragging_the_last_task_to_another_list_preserves_the_item_and_removes_the_emp
 }
 
 #[test]
-fn box_selection_starts_only_outside_block_bounds() {
+fn box_selection_drags_from_the_margin_and_tracks_scrolling() {
     use gpui::prelude::*;
 
     struct Page(gpui::Entity<gpdoc::EditorView>);
@@ -1381,7 +1409,9 @@ fn box_selection_starts_only_outside_block_bounds() {
     let source = DocumentSource::Blocks(
         ["First", "Second", "Third"]
             .map(|s| Node::text("paragraph", s))
-            .to_vec(),
+            .into_iter()
+            .chain(vec![Node::text("paragraph", "More"); 100])
+            .collect(),
     );
     // Editing the document must also invalidate cached host views.
     struct Host(gpui::Entity<Page>);
@@ -1411,6 +1441,33 @@ fn box_selection_starts_only_outside_block_bounds() {
     assert!(cx.debug_bounds("gpdoc-box-selection").is_none());
     cx.simulate_mouse_up(first, drag, Default::default());
 
+    let row_height = second.y - first.y;
+    let scroll = |position, rows| gpui::ScrollWheelEvent {
+        position,
+        delta: gpui::ScrollDelta::Pixels(point(px(0.), row_height * rows)),
+        ..Default::default()
+    };
+    // Scrolling a pending press must not count toward the four-pixel drag threshold.
+    cx.simulate_mouse_down(origin, drag, Default::default());
+    let caret = cx.update(|_, cx| entity.read(cx).editor().selection());
+    cx.simulate_event(scroll(origin, -3.));
+    assert!(cx.debug_bounds("gpdoc-box-selection").is_none());
+    let near = point(origin.x + px(3.), origin.y);
+    cx.simulate_mouse_move(near, drag, Default::default());
+    assert!(cx.debug_bounds("gpdoc-box-selection").is_none());
+    cx.update(|_, cx| assert_eq!(entity.read(cx).editor().selection(), caret));
+    let threshold = point(origin.x + px(4.), origin.y);
+    cx.simulate_mouse_move(threshold, drag, Default::default());
+    assert_eq!(
+        cx.debug_bounds("gpdoc-box-selection"),
+        Some(Bounds::from_corners(
+            point(origin.x, origin.y - row_height * 3.),
+            threshold,
+        ))
+    );
+    cx.simulate_mouse_up(threshold, drag, Default::default());
+    cx.simulate_event(scroll(origin, 3.));
+
     cx.simulate_mouse_down(origin, drag, Default::default());
     cx.simulate_mouse_move(first, drag, Default::default());
     assert_eq!(
@@ -1427,6 +1484,38 @@ fn box_selection_starts_only_outside_block_bounds() {
     cx.update(|_, cx| assert_eq!(entity.read(cx).editor().selection(), expected));
     cx.simulate_mouse_up(first, drag, Default::default());
     assert!(cx.debug_bounds("gpdoc-box-selection").is_none());
+    cx.update(|_, cx| assert_eq!(entity.read(cx).editor().selection(), expected));
+
+    // Keep the pointer still while the document moves past the drag origin.
+    cx.simulate_mouse_down(origin, drag, Default::default());
+    cx.simulate_mouse_move(first, drag, Default::default());
+    let observed = Rc::new(Cell::new(None));
+    let _subscription = cx.update(|_, cx| {
+        let observed = observed.clone();
+        cx.observe(&entity, move |editor, cx| {
+            observed.set(Some(editor.read(cx).editor().selection()));
+        })
+    });
+    let forward = Selection::NodeRange {
+        anchor: DocPos(7),
+        head: DocPos(28),
+    };
+    for (rows, anchor_y, selection) in [
+        (-3., origin.y - row_height * 3., forward),
+        (3., origin.y, expected),
+    ] {
+        cx.simulate_event(scroll(first, rows));
+        assert_eq!(
+            cx.debug_bounds("gpdoc-box-selection"),
+            Some(Bounds::from_corners(
+                point(origin.x, anchor_y.min(first.y)),
+                point(first.x, anchor_y.max(first.y))
+            ))
+        );
+        cx.update(|_, cx| assert_eq!(entity.read(cx).editor().selection(), selection));
+        assert_eq!(observed.get(), Some(selection));
+    }
+    cx.simulate_mouse_up(first, drag, Default::default());
     cx.update(|_, cx| assert_eq!(entity.read(cx).editor().selection(), expected));
 
     for inside in [second, point(second.x + px(150.), second.y)] {
@@ -1537,7 +1626,7 @@ fn filtered_block_drop_passes_to_the_next_handler() {
     let fallback_called = Rc::new(Cell::new(false));
     let config = EditorConfig::builder()
         .plugin(paragraph())
-        .plugin(Plugin::new("rejectDocumentChanges", |p| {
+        .plugin(Plugin::<()>::new("rejectDocumentChanges", |p| {
             p.filter_transaction(|change| {
                 Ok(change.before.is_none_or(|old| old == change.document))
             });

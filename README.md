@@ -16,7 +16,7 @@ use gpui::{Application, WindowOptions};
 fn main() {
     Application::new().run(|cx| {
         let config = EditorConfig::builder()
-            .plugins([paragraph(), bold()])
+            .plugin(paragraph()).plugin(bold())
             .build()
             .expect("configure editor");
 

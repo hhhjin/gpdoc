@@ -101,9 +101,9 @@ fn convert(m: Match) -> [Edit; 3] {
     ]
 }
 
-pub(super) fn rules(p: &mut PluginSpec, options: Arc<LinkOptions>) {
+pub(super) fn rules(p: &mut PluginSpec<crate::Config>, options: Arc<LinkOptions>) {
     let typed = options.clone();
-    p.mark_input_rule("link", move |ctx| {
+    p.input_rules().markdown_link().set(move |ctx| {
         let Selection::Text { anchor, head } = ctx.selection else {
             return Ok(None);
         };
@@ -137,7 +137,7 @@ pub(super) fn rules(p: &mut PluginSpec, options: Arc<LinkOptions>) {
         }
         Ok(Some(convert(m).into()))
     });
-    p.paste_rule(move |ctx| {
+    p.paste_rules().markdown_link().set(move |ctx| {
         let mut found = Vec::new();
         pasted_textblocks(&ctx, "link", |pos, text| {
             found.extend(matches(text, pos, &options))
@@ -154,13 +154,11 @@ mod tests {
     #[test]
     fn markdown_links_preserve_the_label_title_and_escaped_text() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                crate::link(LinkOptions {
-                    markdown_links: true,
-                    ..Default::default()
-                }),
-            ])
+            .plugin(paragraph())
+            .plugin(crate::link(LinkOptions {
+                markdown_links: true,
+                ..Default::default()
+            }))
             .build()
             .unwrap();
         let mut editor =

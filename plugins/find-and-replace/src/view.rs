@@ -121,13 +121,11 @@ mod tests {
         let scans = Arc::new(AtomicUsize::new(0));
         let count = scans.clone();
         let config = EditorConfig::builder()
-            .plugins([
-                paragraph(),
-                find_and_replace_with(move |_| {
-                    count.fetch_add(1, Ordering::Relaxed);
-                    false
-                }),
-            ])
+            .plugin(paragraph())
+            .plugin(find_and_replace_with(move |_| {
+                count.fetch_add(1, Ordering::Relaxed);
+                false
+            }))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

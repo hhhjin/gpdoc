@@ -19,19 +19,62 @@ cargo add gpdoc-plugin-list-item
 
 ## Example
 
-For this example, add `gpdoc-plugin-bullet-list` to your [Quickstart project](/docs/quickstart/). Create one bullet item and split it at the caret.
+Add `gpdoc-plugin-bullet-list` to the [Quickstart app](/docs/quickstart/#configure-the-editor) to render these items inside a bullet list.
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
-use gpdoc_plugin_bullet_list::bullet_list;
-use gpdoc_plugin_list_item::list_item;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_bullet_list::bullet_list;
+use gpdoc_plugin_list_item::{list_item, list_item_body};
+use gpui::{div, prelude::*};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(list_item())
     .plugin(bullet_list())
-    .build()?;
+    .plugin(list_item().with_view(item_view))
+    .build()
+    .expect("configure editor");
+
+fn item_view() -> ViewPlugin {
+    list_item_body(|row, _, _| div().flex().child(row.marker).child(row.content))
+}
+```
+
+Type `-` followed by a space to start a bullet list. Press **Enter** after the item text to create the next row.
+
+## Compose a list item
+
+The plugin passes each row its immediate parent list, zero-based index, marker, and editable body. Nested lists start counting again at their own first item.
+
+### Anatomy
+
+```text
+list_item_body(...)
+└── div()            Item row
+    ├── marker       Bullet or number for this item
+    └── row.content  Editable body, including nested lists
+```
+
+### Choose the marker for each list
+
+Replace `item_view` in the example above.
+
+```rust
+fn item_view() -> ViewPlugin {
+    list_item_body(|row, _, _| {
+        let marker = if row.start.is_some() { row.marker } else { "–".into() };
+        div().flex().child(marker).child(row.content)
+    })
+}
+```
+
+Bullet items now display a dash. Ordered items keep the number calculated from their parent list.
+
+## Split an item at the caret
+
+```rust
+use gpdoc::{DocPos, Editor, Node, Selection};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "DraftReview")])?;
 editor.run(gpdoc_plugin_bullet_list::Toggle)?;
 editor.select(Selection::caret(DocPos(8)))?;
@@ -85,7 +128,7 @@ For Backspace and Delete at item boundaries, add [List keyboard shortcuts](/docs
 
 ## Custom list plugins
 
-`list_container(p: &mut PluginSpec, kind: &'static str, attrs: AttrSpecs)` registers a container that accepts one or more list items. To wrap selected paragraphs, register your own command and call `wrap_list` in its handler.
+`list_container<S>(p: &mut PluginSpec<S>, kind: &'static str, attrs: AttrSpecs)` registers a container that accepts one or more list items. To wrap selected paragraphs, register your own command and call `wrap_list` in its handler.
 
 ### Command helpers
 
@@ -117,28 +160,6 @@ pub fn list_input_rule(
 ```
 
 Pass a valid regular expression matching the marker from the start of the paragraph through the caret. The callback receives its first capture, or an empty string if there is no capture. Return the container and item attributes in that order to replace the typed marker with a list, or `None` to leave the text as typed.
-
-## Compose a GPUI view
-
-With the `gpui` feature, `list_item()` displays a bullet or a decimal number next to each editable item by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(list_item().with_view(views::item))
-```
-
-In `views.rs`, place the editable content once. The renderer receives the immediate parent list, zero-based item index, optional ordered start, and a display marker. Sublist indices start again at zero.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_list_item::list_item_body;
-use gpui::{div, prelude::*, px};
-
-pub fn item() -> ViewPlugin {
-    list_item_body(|row, _, _| {
-        div().flex().gap(px(8.)).child(row.marker).child(div().flex_1().min_w_0().child(row.content))
-    })
-}
-```
 
 ## Source code
 

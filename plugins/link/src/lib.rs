@@ -108,7 +108,14 @@ impl Command for Toggle {
 
 unit_command!(pub Unset, "unsetLink");
 
-pub fn link(options: LinkOptions) -> Plugin {
+gpdoc_plugin::plugin_config! {
+    pub Config {
+        input_rules InputRules { markdown_link: mark("link"), autolink: mark("link") }
+        paste_rules PasteRules { markdown_link: paste, autolink: paste, link_selection: handle_paste }
+    }
+}
+
+pub fn link(options: LinkOptions) -> Plugin<Config> {
     let attrs = ["href", "target", "rel", "class", "title"]
         .map(|key| {
             let value = match key {
@@ -124,7 +131,7 @@ pub fn link(options: LinkOptions) -> Plugin {
         .into();
     let protocols = options.protocols.clone();
     let toggle_protocols = protocols.clone();
-    let plugin = Plugin::new("link", |p| {
+    let plugin = Plugin::<Config>::new("link", |p| {
         p.mark(
             MarkSpec::new("link")
                 .inclusive_end(options.autolink)
@@ -165,7 +172,7 @@ pub fn link(options: LinkOptions) -> Plugin {
         }
         let options_for_paste = options.clone();
         let paste_finder = finder.clone();
-        p.paste_rule(move |ctx| {
+        p.paste_rules().autolink().set(move |ctx| {
             let mut steps = Vec::new();
             pasted_textblocks(&ctx, "link", |from, text| {
                 for link in paste_finder.links(text) {
@@ -196,7 +203,7 @@ pub fn link(options: LinkOptions) -> Plugin {
         if options.link_on_paste {
             let options = options.clone();
             let finder = finder.clone();
-            p.handle_paste(move |ctx, text| {
+            p.paste_rules().link_selection().set(move |ctx, text| {
                 if ctx.selection().bounds(ctx.document()).is_empty() {
                     return Ok(None);
                 }
@@ -212,7 +219,9 @@ pub fn link(options: LinkOptions) -> Plugin {
             });
         }
         if options.autolink {
-            p.mark_input_rule("link", move |ctx| auto_link(ctx, &finder, &options));
+            p.input_rules()
+                .autolink()
+                .set(move |ctx| auto_link(ctx, &finder, &options));
         }
     })
     .priority(1000);
@@ -426,7 +435,8 @@ mod tests {
     #[test]
     fn paste_link_keeps_selected_text_and_checks_schemes() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), link(Default::default())])
+            .plugin(paragraph())
+            .plugin(link(Default::default()))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

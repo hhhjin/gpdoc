@@ -118,7 +118,8 @@ mod tests {
     #[test]
     fn pasted_duplicate_before_original_gets_new_id_and_undo_restores_document() {
         let config = gpdoc_plugin::core::EditorConfig::builder()
-            .plugins([paragraph(), unique_id(["paragraph"])])
+            .plugin(paragraph())
+            .plugin(unique_id(["paragraph"]))
             .build()
             .unwrap();
         let mut editor = gpdoc_plugin::core::Editor::from_document(

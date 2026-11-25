@@ -19,19 +19,66 @@ Run this from a [Quickstart project](/docs/quickstart/).
 cargo add gpdoc-plugin-find-and-replace
 ```
 
-## Replace every occurrence of a word
+## Example
 
-Register `find_and_replace()` and `paragraph()` in the editor config. Open a paragraph containing `draft and draft`, then replace both matches.
+Use `search_highlights` with the built-in `paint_match` painter to display matches in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_find_and_replace::{find_and_replace, results, ReplaceAll, SetReplaceTerm, SetSearchTerm};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_find_and_replace::{find_and_replace, paint_match, search_highlights};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(find_and_replace())
-    .build()?;
+    .plugin(find_and_replace().with_view(highlights))
+    .build()
+    .expect("configure editor");
+
+fn highlights() -> ViewPlugin {
+    search_highlights(paint_match)
+}
+```
+
+Run `SetSearchTerm("draft".into())` on a document containing `draft and draft`. Both matches receive a highlight.
+
+## Compose a search highlight
+
+The plugin measures the visible fragments of each match and calls your painter for each fragment. A match that wraps across lines has a rectangle on each line.
+
+### Anatomy
+
+```text
+search_highlights(...)  Maps search results to the editor's text layout
+└── MatchHighlight      One visible fragment of a search result
+    ├── current         Whether this result is the active match
+    ├── bounds          Rectangle to paint in the window
+    └── range           Document range of the entire match
+```
+
+### Paint only the current match
+
+Replace `highlights` in the example. Use `hit.current` to decide which fragments to pass to the built-in painter.
+
+```rust
+fn highlights() -> ViewPlugin {
+    search_highlights(|hit, window, cx| {
+        if hit.current {
+            paint_match(hit, window, cx);
+        }
+    })
+}
+```
+
+Run `GoToNextResult` to move the highlight through the matches. The plugin draws the highlight above mark backgrounds and below the native selection.
+
+## Replace every occurrence of a word
+
+Use the configuration above to replace both occurrences of `draft` in one transaction.
+
+```rust
+use gpdoc::{Editor, Node};
+use gpdoc_plugin_find_and_replace::{results, ReplaceAll, SetReplaceTerm, SetSearchTerm};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "draft and draft")])?;
 
 editor.run(SetSearchTerm("draft".into()))?;
@@ -44,23 +91,6 @@ assert_eq!(
 	[Node::text("paragraph", "final and final")],
 );
 ```
-
-## Highlight matches in GPUI
-
-The GPUI configuration installs the default highlight when you register the plugin.
-
-```rust
-use gpdoc::EditorConfig;
-use gpdoc_plugin_find_and_replace::find_and_replace;
-use gpdoc_plugin_paragraph::paragraph;
-
-let config = EditorConfig::builder()
-    .plugin(paragraph())
-    .plugin(find_and_replace())
-    .build()?;
-```
-
-Use `find_and_replace().with_view(|| search_highlights(your_painter))` to change the highlight. Your painter receives a `MatchHighlight` for each visible fragment with the committed document range, measured bounds and current-result flag. The plugin caches search results and maps them through wrapping, bidirectional text and IME composition. It paints highlights above mark backgrounds and below the native selection.
 
 ## Settings
 

@@ -7,7 +7,13 @@ unit_command!(pub Split, "splitTaskItem");
 unit_command!(pub Lift, "liftTaskItem");
 unit_command!(pub Sink, "sinkTaskItem");
 
-pub fn task_list() -> Plugin {
+gpdoc_plugin::plugin_shortcuts! {
+    pub Shortcuts {
+        toggle: Toggle => ["Mod-Shift-9"],
+    }
+}
+
+pub fn task_list() -> Plugin<Shortcuts> {
     let spec = NodeSpec::block("taskList")
         .group("block")
         .group("list")
@@ -15,16 +21,51 @@ pub fn task_list() -> Plugin {
     Plugin::new("taskList", |p| {
         p.node(spec);
         p.command::<Toggle>(|ctx, _| toggle_list(ctx, "taskList", "taskItem", &Attrs::new()));
-        p.shortcut("Mod-Shift-9", Toggle);
     })
 }
 
-pub fn task_item() -> Plugin {
+#[derive(Clone)]
+pub struct TaskItemConfig {
+    lift: ShortcutBinding,
+    sink: Option<ShortcutBinding>,
+}
+
+impl Default for TaskItemConfig {
+    fn default() -> Self {
+        Self {
+            lift: ShortcutBinding::new(Lift, [key!("Shift-Tab")]),
+            sink: None,
+        }
+    }
+}
+
+impl TaskItemConfig {
+    pub fn lift(&mut self) -> &mut ShortcutKeys {
+        self.lift.keys()
+    }
+    /// Nesting is available when the plugin was built with nested task items.
+    pub fn sink(&mut self) -> Option<&mut ShortcutKeys> {
+        self.sink.as_mut().map(ShortcutBinding::keys)
+    }
+}
+impl PluginShortcuts for TaskItemConfig {
+    fn into_bindings(self) -> impl IntoIterator<Item = ShortcutBinding> {
+        std::iter::once(self.lift).chain(self.sink)
+    }
+}
+
+gpdoc_plugin::plugin_config! {
+    impl TaskItemConfig {
+        input_rules InputRules { checkbox: input }
+    }
+}
+
+pub fn task_item() -> Plugin<TaskItemConfig> {
     task_item_with_nesting(false)
 }
 
-pub fn task_item_with_nesting(nested: bool) -> Plugin {
-    let plugin = Plugin::new("taskItem", |p| {
+pub fn task_item_with_nesting(nested: bool) -> Plugin<TaskItemConfig> {
+    let plugin = Plugin::<TaskItemConfig>::new("taskItem", |p| {
         p.node(
             NodeSpec::block("taskItem")
                 .content(if nested {
@@ -41,21 +82,23 @@ pub fn task_item_with_nesting(nested: bool) -> Plugin {
         p.command::<Split>(|ctx, _| split_item(ctx, "taskItem"));
         p.on_break("taskItem", |ctx| ctx.plan(Split));
         p.command::<Lift>(|ctx, _| lift_item(ctx, "taskItem"));
-        p.shortcut("Shift-Tab", Lift);
-        p.input_rule(gpdoc_plugin_list_item::list_input_rule(
-            "taskList",
-            "taskItem",
-            r"^\s*\[([ x]?)\]\s$",
-            |mark| {
-                Some((
-                    Attrs::new(),
-                    Attrs::from([("checked".into(), Value::Bool(mark == "x"))]),
-                ))
-            },
-        ));
+
+        p.input_rules()
+            .checkbox()
+            .set(gpdoc_plugin_list_item::list_input_rule(
+                "taskList",
+                "taskItem",
+                r"^\s*\[([ x]?)\]\s$",
+                |mark| {
+                    Some((
+                        Attrs::new(),
+                        Attrs::from([("checked".into(), Value::Bool(mark == "x"))]),
+                    ))
+                },
+            ));
         if nested {
+            p.shortcuts().sink = Some(ShortcutBinding::new(Sink, [key!("Tab")]));
             p.command::<Sink>(|ctx, _| sink_item(ctx, "taskItem"));
-            p.shortcut("Tab", Sink);
         }
     });
     #[cfg(feature = "gpui")]
