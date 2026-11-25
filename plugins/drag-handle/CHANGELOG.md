@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - *(plugins)* [**breaking**] support typed shortcut, rule, and hook customization
 - *(drag-handle)* [**breaking**] support dragging blocks across containers
-## Unreleased
 
 ## 0.1.0
 

@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - *(plugins)* [**breaking**] support typed shortcut, rule, and hook customization
-## Unreleased
 
 ## 0.1.0
 

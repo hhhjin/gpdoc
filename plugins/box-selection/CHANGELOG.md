@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - *(box-selection)* update the drag rectangle and selected blocks on scroll
-## Unreleased
 
 ## 0.1.0
 

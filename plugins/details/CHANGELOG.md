@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Other
 
 - Enable GPUI by default for gpdoc and its plugins
-## Unreleased
 
 ## 0.1.0
 
