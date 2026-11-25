@@ -19,19 +19,29 @@ cargo add gpdoc-plugin-hard-break
 
 Register `hard_break()` with `paragraph()`. The inline `hardBreak` node takes no attributes.
 
-## Insert a break between two words
+## Example
 
-In a [Quickstart project](/docs/quickstart/), put the caret between `First` and `Second` and insert a break.
+Register the inline break alongside a paragraph that can contain it. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
-use gpdoc_plugin_hard_break::hard_break;
+use gpdoc::EditorConfig;
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_hard_break::hard_break;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(hard_break())
-    .build()?;
+    .build()
+    .expect("configure editor");
+```
+
+Type `First`, press **Shift + Enter**, and type `Second`. Both lines belong to the same paragraph.
+
+## Insert a break between two words
+
+```rust
+use gpdoc::{DocPos, Editor, Node, Selection};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "FirstSecond")])?;
 editor.select(Selection::caret(DocPos(6)))?;
 editor.run(gpdoc_plugin_hard_break::Set)?;

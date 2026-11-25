@@ -11,22 +11,23 @@ Click either quoted paragraph. The highlight follows the paragraph containing th
 
 <ViewPluginExample plugin="focus" title="Focus example" />
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register the plugin.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-focus
 ```
 
+## Example
+
 ```rust
-use gpdoc_plugin_focus::{FocusMode, focus};
+use gpdoc_plugin_focus::{FocusMode, focus, paint_focus};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = gpdoc::EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(focus(FocusMode::Deepest))
-    .build()?;
+    .plugin(focus(FocusMode::Deepest).with_view(paint_focus))
+    .build()
+    .expect("configure editor");
 ```
 
 Pass your own painter to `.with_view(...)` to change the appearance. It receives the selected block’s bounds, window, and app. With `FocusMode::All`, the plugin calls it once for each visible enclosing block.

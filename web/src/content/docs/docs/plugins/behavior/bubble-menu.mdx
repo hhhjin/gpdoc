@@ -11,40 +11,70 @@ Drag across “the headline” to show the menu above the selection. Click a wor
 
 <ViewPluginExample plugin="bubble-menu" title="Bubble menu example" />
 
-## Register the plugin
-
-Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
+## Install
 
 ```sh
-cargo add gpdoc-plugin-bubble-menu
+cargo add gpdoc-plugin-bubble-menu gpdoc-plugin-bold
 ```
 
-`.plugin(bubble_menu())` reserves the menu name. Attach a view to supply its contents and open it when the selection matches.
+## Example
+
+Attach a renderer to show a menu above selected text in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
+use gpdoc::{EditorConfig, EditorView};
+use gpdoc_plugin_bold::bold;
 use gpdoc_plugin_bubble_menu::bubble_menu;
 use gpdoc_plugin_paragraph::paragraph;
+use gpui::{App, Div, Entity, Window, div, prelude::*};
 
-mod menus;
-
-let config = gpdoc::EditorConfig::builder()
+let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(bubble_menu().with_view(menus::bubble_menu))
-    .build()?;
-```
+    .plugin(bold())
+    .plugin(bubble_menu().with_view(format_menu))
+    .build()
+    .expect("configure editor");
 
-In `menus.rs`, compose the contents with GPUI elements. The function receives the editor entity so controls can run commands. The plugin positions the result above the selection and keeps keyboard focus in the editor.
-
-```rust
-use gpdoc::EditorView;
-use gpui::{App, Entity, Window, div, prelude::*};
-
-pub fn bubble_menu(_: Entity<EditorView>, _: &mut Window, _: &mut App) -> gpui::Div {
+fn format_menu(_: Entity<EditorView>, _: &mut Window, _: &mut App) -> Div {
     div().child("Selected text")
 }
 ```
 
-Select a word to display the menu above it. Collapsing the selection to a caret hides the menu.
+Select a word to see **Selected text**.
+
+## Compose a bubble menu
+
+The plugin positions the menu above the selection and keeps focus in the editor while you click its controls.
+
+### Anatomy
+
+```text
+bubble_menu().with_view(...)  Positions the menu above selected text
+└── div().id(...)             Runs an editor command on click
+```
+
+### Format the selected text
+
+Replace `format_menu` with a button that runs the Bold plugin's command on the same editor.
+
+```rust
+use gpdoc_plugin_bold::Toggle;
+use gpui::Stateful;
+
+fn format_menu(editor: Entity<EditorView>, _: &mut Window, cx: &mut App) -> Stateful<Div> {
+    let active = editor.read(cx).editor().mark_active("bold").unwrap_or(false);
+    div()
+        .id("bubble_menu-bold")
+        .child(if active { "Remove bold" } else { "Bold" })
+        .on_click(move |_, window, cx| {
+            editor.update(cx, |view, cx| {
+                view.run(Toggle, window, cx).expect("toggle bold");
+            });
+        })
+}
+```
+
+Select a word and click **Bold**. The button now reads **Remove bold**. Collapse the selection to hide the menu.
 
 Use `.named("linkMenu").show_when(|editor| editor.editor().mark_active("link").unwrap_or(false))` before `.with_view(...)` to register a second menu for links. Each menu needs a unique name. See [Floating menu](/docs/plugins/behavior/floating-menu/) for a caret in an empty paragraph.
 

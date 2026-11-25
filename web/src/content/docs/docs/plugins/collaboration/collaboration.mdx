@@ -19,9 +19,29 @@ The example uses the editor engine and the paragraph plugin from the [Quickstart
 cargo add gpdoc-plugin-collaboration
 ```
 
+## Example
+
+Seed the document once. `new` takes ownership of Alice's editor and creates a named XML fragment. Bob joins by passing the full update to `from_update`. Both use the same fragment name and a config that recognizes the document's nodes and marks.
+
+```rust
+use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
+use gpdoc_plugin_collaboration::{Collaboration, StateVector};
+use gpdoc_plugin_paragraph::paragraph;
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .build()
+    .expect("configure editor");
+let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi")])?;
+let mut alice = Collaboration::new(editor, "default")?;
+
+let seed = alice.update_since(&StateVector::default());
+let mut bob = Collaboration::from_update(&config, "default", &seed)?;
+```
+
 ## Connect a GPUI view
 
-Install the collaboration plugin with `cargo add gpdoc-plugin-collaboration`. Import `CollaborationView` alongside `Collaboration` to bind a session to an existing `Editor`.
+Import `CollaborationView` alongside `Collaboration` to bind a session to an existing `Editor`.
 
 ```rust
 use gpdoc_plugin_collaboration::{Collaboration, CollaborationView};
@@ -31,37 +51,6 @@ view.bind_collaboration(session, send_update, window, cx)?;
 ```
 
 The app's `send_update` function sends the encoded bytes to other peers. Deliver incoming bytes with `view.receive_collaboration_update(update, window, cx)?`. The binding queues incoming updates during IME composition. Undo and redo use the local peer's collaboration history.
-
-## Open a shared document
-
-The next three snippets form a two-peer example. Add these imports to `src/main.rs`, then put the snippets inside `main` before `Ok(())`.
-
-```rust
-use gpdoc_plugin::core::{DocPos, Node, Selection};
-use gpdoc_plugin_collaboration::{Collaboration, StateVector};
-use gpdoc_plugin_paragraph::paragraph;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-	// Add the three snippets here.
-	Ok(())
-}
-```
-
-### `new` and `from_update`
-
-Seed the document once. `new` takes ownership of Alice's editor and creates a named XML fragment. Bob joins by passing the full update to `from_update`. Both use the same fragment name and a config that recognizes the document's nodes and marks.
-
-```rust
-use gpdoc::{Editor, EditorConfig};
-let config = EditorConfig::builder()
-    .plugin(paragraph())
-    .build()?;
-let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi")])?;
-let mut alice = Collaboration::new(editor, "default")?;
-
-let seed = alice.update_since(&StateVector::default());
-let mut bob = Collaboration::from_update(&config, "default", &seed)?;
-```
 
 ## Send an edit to another peer
 
@@ -86,8 +75,6 @@ assert_eq!(bob.editor().document().blocks(), [Node::text("paragraph", "Hi")]);
 bob.apply_update(&alice.redo()?)?;
 assert_eq!(bob.editor().document().blocks(), [Node::text("paragraph", "Hi!")]);
 ```
-
-Run `cargo run`. All three assertions pass silently.
 
 ## Work with a fork of the session
 

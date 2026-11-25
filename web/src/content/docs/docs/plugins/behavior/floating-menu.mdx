@@ -11,40 +11,69 @@ Click at the end of “Meeting notes” and press **Enter**. The menu appears ab
 
 <ViewPluginExample plugin="floating-menu" title="Floating menu example" />
 
-## Register the plugin
-
-Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
+## Install
 
 ```sh
-cargo add gpdoc-plugin-floating-menu
+cargo add gpdoc-plugin-floating-menu gpdoc-plugin-heading
 ```
 
-`.plugin(floating_menu())` reserves the menu name. Attach a view to supply its contents and open it when the selection matches.
+## Example
+
+Attach a renderer to show a menu at the caret in an empty top-level paragraph in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
+use gpdoc::{EditorConfig, EditorView};
+use gpdoc_plugin_heading::heading;
 use gpdoc_plugin_floating_menu::floating_menu;
 use gpdoc_plugin_paragraph::paragraph;
+use gpui::{App, Div, Entity, Window, div, prelude::*};
 
-mod menus;
-
-let config = gpdoc::EditorConfig::builder()
+let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(floating_menu().with_view(menus::floating_menu))
-    .build()?;
-```
+    .plugin(heading())
+    .plugin(floating_menu().with_view(insert_menu))
+    .build()
+    .expect("configure editor");
 
-In `menus.rs`, compose the contents with GPUI elements. The function receives the editor entity so controls can run commands. The plugin positions the result above the selection and keeps keyboard focus in the editor.
-
-```rust
-use gpdoc::EditorView;
-use gpui::{App, Entity, Window, div, prelude::*};
-
-pub fn floating_menu(_: Entity<EditorView>, _: &mut Window, _: &mut App) -> gpui::Div {
+fn insert_menu(_: Entity<EditorView>, _: &mut Window, _: &mut App) -> Div {
     div().child("Insert a block")
 }
 ```
 
-Press **Enter** to create an empty top-level paragraph. The menu disappears when you type. The predicate uses the config's default text block, including custom default block types.
+Press **Enter** at the end of a top-level paragraph to see **Insert a block**.
+
+## Compose a floating menu
+
+The plugin opens the menu for the config's default text block and keeps focus in the editor while you click its controls.
+
+### Anatomy
+
+```text
+floating_menu().with_view(...)  Positions the menu at the caret in an empty top-level paragraph
+└── div().id(...)             Runs an editor command on click
+```
+
+### Turn the paragraph into a heading
+
+Replace `insert_menu` with a button that runs the Heading plugin's command on the same editor.
+
+```rust
+use gpdoc_plugin_heading::{Level, Set};
+use gpui::Stateful;
+
+fn insert_menu(editor: Entity<EditorView>, _: &mut Window, _: &mut App) -> Stateful<Div> {
+    div()
+        .id("floating_menu-heading")
+        .child("Heading 2")
+        .on_click(move |_, window, cx| {
+            editor.update(cx, |view, cx| {
+                view.run(Set(Level::H2), window, cx).expect("set heading");
+            });
+        })
+}
+```
+
+Create an empty paragraph and click **Heading 2**. The menu closes and you can type the heading.
 
 See [Bubble menu](/docs/plugins/behavior/bubble-menu/) for controls above selected content.
 

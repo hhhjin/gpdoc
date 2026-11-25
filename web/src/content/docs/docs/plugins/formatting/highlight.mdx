@@ -13,55 +13,33 @@ Highlight adds the `highlight` mark. Use it to call attention to a phrase while 
 
 ## Install
 
-From your [Quickstart project](/docs/quickstart/), add the plugin.
-
 ```sh
 cargo add gpdoc-plugin-highlight
 ```
 
-Add `gpdoc_plugin_highlight::highlight()` to your editor config to store highlights on text.
-
 ## Example
 
-The first paragraph starts at document position `1`. The range `12..20` selects `notebook`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+Set a fallback highlight color in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
-use gpdoc_plugin_highlight::highlight;
+use gpdoc::{EditorConfig, PluginViewExt};
+use gpdoc_plugin_highlight::{highlight, highlight_format};
 use gpdoc_plugin_paragraph::paragraph;
 
-fn main() -> Result<(), Error> {
-	let config = EditorConfig::builder()
-	    .plugin(paragraph())
-	    .plugin(highlight())
-	    .build()?;
-	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Bring your notebook to the workshop.")])?;
-	editor.select(Selection::Text {
-		anchor: DocPos(12),
-		head: DocPos(20),
-	})?;
-
-	editor.run(gpdoc_plugin_highlight::Set(None))?;
-	println!("{}", editor.document().blocks()[0].to_json());
-	Ok(())
-}
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(highlight().with_view(|| highlight_format([255, 232, 135])))
+    .build()
+    .expect("configure editor");
 ```
 
-The word `notebook` now carries the highlight mark.
+Type `==important==` to highlight the word with the yellow background set by the formatter.
 
 ## Settings
 
 ### `highlight`
 
 Use this constructor for highlights with a shared appearance. Choose a fallback RGB color in the GPUI formatter to give these marks a visible background.
-
-```rust
-use gpdoc::EditorConfig;
-let config = EditorConfig::builder()
-    .plugin(paragraph())
-    .plugin(highlight())
-    .build()?;
-```
 
 ### `multicolor_highlight`
 
@@ -110,7 +88,3 @@ editor.run(gpdoc_plugin_highlight::Unset)?;
 Toggle highlighting with **Command + Shift + H** on macOS or **Ctrl + Shift + H** on Windows and Linux.
 
 Typing `==important==` highlights the word between the delimiters.
-
-## Native appearance
-
-In a GPUI editor, `multicolor_highlight()` uses the CSS color stored on each mark. An uncolored mark inherits its background. To choose a fallback for marks with a missing or invalid color, import `gpdoc::PluginViewExt` and register `highlight().with_view(|| highlight_format([255, 232, 135]))` or attach the same view to `multicolor_highlight()`.

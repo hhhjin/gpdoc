@@ -17,61 +17,69 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 cargo add gpdoc-plugin-table
 ```
 
-Register `table()` to get an editable grid with cell selection and column resizing. To supply cell borders, custom headers or a resize guide, attach your own composition.
-
-```rust
-use gpdoc::{EditorConfig, PluginViewExt};
-use gpdoc_plugin_paragraph::paragraph;
-use gpdoc_plugin_table::table;
-
-mod views;
-
-let config = EditorConfig::builder()
-    .plugin(paragraph())
-    .plugin(table().with_view(views::table_grid_view))
-    .build()?;
-```
-
-In `views.rs`, compose decorations and editable content for each cell. The cell includes its document node, position, row and column ranges, and selection state. Add background layers in paint order. The grid inserts the editable subtree into the container passed to `content` and retains the full cell bounds for hit testing.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_table::{TableCell, default_resize_guide, table_grid};
-use gpui::{App, Window, div, prelude::*, px, rgb, rgba};
-
-pub fn table_grid_view() -> ViewPlugin {
-    table_grid(cell, default_resize_guide)
-}
-
-fn cell(mut cell: TableCell, _: &mut Window, _: &mut App) -> TableCell {
-    let background = div()
-        .border_1()
-        .border_color(rgb(0xc8cbd0))
-        .when(cell.is_header(), |el| el.bg(rgb(0xf0f2f5)));
-    cell = cell.layer(background);
-    if cell.selected {
-        cell = cell.layer(div().bg(rgba(0x548de83d)));
-    }
-    cell.content(div().p(px(4.)))
-}
-```
-
-Use `table_grid(default_cell, default_resize_guide)` for the built-in appearance. To draw a custom resize guide, pass a painter taking the guide bounds, window and app. Use `.plugin(table())` for table commands alone.
+Register `table()` to get an editable grid with cell selection and column resizing.
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), insert a 3-row, 2-column table with a header row.
+Register the supplied bordered cells and resize guide in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use std::num::NonZeroUsize;
-use gpdoc::{Editor, EditorConfig, Node};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
-use gpdoc_plugin_table::table;
+use gpdoc_plugin_table::{default_cell, default_resize_guide, table, table_grid};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(table())
-    .build()?;
+    .plugin(table().with_view(grid_view))
+    .build()
+    .expect("configure editor");
+
+fn grid_view() -> ViewPlugin {
+    table_grid(default_cell, default_resize_guide)
+}
+```
+
+Insert a table with `gpdoc_plugin_table::Insert::default()`. Drag a column boundary to resize it.
+
+## Compose a table grid
+
+The grid measures cells, selects them on pointer input, and resizes columns. Supply a renderer for each cell and a painter for the resize guide.
+
+### Anatomy
+
+```text
+table_grid(cell, resize_guide)
+├── cell                 Renderer for each measured cell
+│   ├── cell.layer(...)  Optional decoration behind the editable blocks
+│   └── cell.content(...) Container for the editable blocks
+└── resize_guide         Painter for the dragged column boundary
+```
+
+### Assemble the cell and resize guide
+
+Replace `grid_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn grid_view() -> ViewPlugin {
+    table_grid(|cell, _, _| {
+        let content = if cell.is_header() { div().child("Header") } else { div() };
+        cell.content(content)
+    }, default_resize_guide)
+}
+```
+
+The grid adds the editable blocks to your container. To decorate a full cell, use `cell.layer(...)` before `cell.content(...)`. The grid paints layers in the order you add them.
+
+The default `table()` view uses the surrounding text color for selection and resizing. `default_cell` and `default_resize_guide` provide the bordered cells and blue guide used in the first example.
+
+## Insert a table with a header row
+
+```rust
+use gpdoc::{Editor, Node};
+use std::num::NonZeroUsize;
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
 editor.run(gpdoc_plugin_table::Insert {
     rows: NonZeroUsize::new(3).unwrap(),

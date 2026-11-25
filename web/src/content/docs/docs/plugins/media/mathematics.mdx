@@ -19,43 +19,61 @@ cargo add gpdoc-plugin-mathematics
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), insert an inline formula at the end of the first paragraph.
+Register the typesetting view for inline and block formulas in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Node, Selection};
-use gpdoc_plugin_mathematics::mathematics;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_mathematics::{mathematics, formula_content};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(mathematics())
-    .build()?;
-let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Area: ")])?;
-editor.select(Selection::caret(DocPos(7)))?;
-editor.run(gpdoc_plugin_mathematics::InsertInline {
-    latex: r"\pi r^2".into(),
-    pos: None,
-})?;
+    .plugin(mathematics().with_view(formula_view))
+    .build()
+    .expect("configure editor");
 
-assert_eq!(editor.document().node_at(DocPos(7)).unwrap().kind, "inlineMath");
+fn formula_view() -> ViewPlugin {
+    formula_content()
+}
 ```
 
-The paragraph text starts at document position `1`. The six characters in `Area: ` put the insertion point at `7`. The Rust raw string preserves the backslash in `\pi`.
+Type `$$x^2$$` inside a paragraph. The closing delimiter replaces the typed source with an inline formula.
 
-## Native view
+## Compose a formula control
 
-The default mathematics view typesets inline and block formulas.
+`mathematics()` typesets both inline and block formulas. Use `formula_controls` to place a GPUI element over each formula while the editor continues to draw the math underneath.
+
+### Anatomy
+
+```text
+formula_controls(...)     Supplies a FormulaNode for each inline or block formula
+└── div().size_full()     Your control covers the measured formula
+    └── on_click(...)     Your action uses the source from formula.latex()
+```
+
+### Copy a formula's LaTeX on click
+
+In the example above, replace the `formula_content` import with `formula_controls`. Return both views from `formula_view` so inline and block formulas support the same action.
 
 ```rust
-use gpdoc_plugin_mathematics::mathematics;
+use gpui::{ClipboardItem, div, prelude::*};
 
-let config = gpdoc::EditorConfig::builder()
-    .plugin(gpdoc_plugin_paragraph::paragraph())
-    .plugin(mathematics())
-    .build()?;
+fn formula_view() -> [ViewPlugin; 2] {
+    formula_controls(|formula, _, _| {
+        let source = formula.latex().to_owned();
+        div()
+            .id(("copy-latex", formula.slot.before.0))
+            .size_full()
+            .on_click(move |_, _, cx| {
+                cx.write_to_clipboard(ClipboardItem::new_string(source.clone()));
+            })
+    })
+}
 ```
 
-The standalone `inline_math()` and `block_math()` plugins each install their own formula view. For an application-owned control over both typeset formulas, return `formula_controls(render)` from your view function. The renderer receives a `FormulaNode` with `latex()`, `is_display()`, and `set_latex(source)`. Apply the returned transaction with `Editor::apply_node_view` when the user saves the new source. The standalone plugins provide corresponding `inline_formula_controls` and `block_formula_controls` factories.
+Click the formula in the example and paste into a text field to see `x^2`. To edit a formula, pass the new source to `formula.set_latex(source)` and apply the returned transaction with `EditorView::apply_node_view`. Use `formula.is_display()` to distinguish block from inline formulas.
+
+The standalone `inline_math()` and `block_math()` plugins accept `inline_formula_controls` and `block_formula_controls`, respectively.
 
 ## Settings
 

@@ -19,19 +19,66 @@ cargo add gpdoc-plugin-details
 
 Register `details()` to install the disclosure node and its two child types. The summary holds text. The body holds one or more blocks.
 
-## Wrap a paragraph and give it a summary
+## Example
 
-In a [Quickstart project](/docs/quickstart/), install the details plugin. Wrap a paragraph, then type the summary at the new caret.
+Register the disclosure and its summary view alongside paragraphs for the body. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_details::details;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_details::{DetailsSummary, details, disclosure};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(details())
-    .build()?;
+    .plugin(details().with_view(header_view))
+    .build()
+    .expect("configure editor");
+
+fn header_view() -> ViewPlugin {
+    disclosure(DetailsSummary::render)
+}
+```
+
+Run `gpdoc_plugin_details::Set` on a paragraph, then type a summary. Click the arrow beside the summary to open the body.
+
+## Compose a GPUI disclosure
+
+The plugin supplies the fold trigger and editable summary. It manages the body and keyboard navigation.
+
+### Anatomy
+
+```text
+disclosure(...)
+└── div()               Summary row
+    ├── header.trigger  Toggles the body on click
+    └── header.content  Editable summary
+```
+
+### Assemble the disclosure header
+
+Replace `header_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn header_view() -> ViewPlugin {
+    disclosure(|header, _, _| {
+        div().flex()
+            .child(header.trigger.child(if header.open { "−" } else { "+" }))
+            .child(header.content)
+    })
+}
+```
+
+Click the plus sign to open the body. The trigger now displays a minus sign.
+
+To wrap the body as well, call `.wrap_node("detailsContent", ...)` on the view returned by `disclosure` and place the supplied editable content inside your wrapper.
+
+## Wrap a paragraph and give it a summary
+
+```rust
+use gpdoc::{Editor, Node};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "The full change log.")])?;
 editor.run(gpdoc_plugin_details::Set)?;
 editor.insert_text("Release details")?;
@@ -55,41 +102,6 @@ let config = EditorConfig::builder()
     .plugin(details_with_persistence(true))
     .build()?;
 ```
-
-## Compose a GPUI disclosure
-
-With the `gpui` feature, `details()` places a clickable disclosure arrow beside the editable summary and installs folding and keyboard navigation. Attach a view when you want a custom header.
-
-```rust
-use gpdoc::PluginViewExt;
-use gpdoc_plugin_details::details;
-use gpdoc_plugin_paragraph::paragraph;
-
-mod views;
-
-let config = gpdoc::EditorConfig::builder()
-    .plugin(paragraph())
-    .plugin(details().with_view(views::disclosure_header))
-    .build()?;
-```
-
-In `views.rs`, place the trigger beside the editable summary. The trigger toggles the fold. The details plugin keeps the selection and keyboard navigation in sync with the visible body.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_details::disclosure;
-use gpui::{div, prelude::*, px};
-
-pub fn disclosure_header() -> ViewPlugin {
-    disclosure(|header, _, _| {
-        div().flex().gap(px(8.))
-            .child(header.trigger.child(if header.open { "−" } else { "+" }))
-            .child(div().flex_1().min_w_0().child(header.content))
-    })
-}
-```
-
-Use `disclosure(DetailsSummary::render)` with `DetailsSummary` from the details crate for a disclosure arrow with a fixed-width control. To decorate the opened body, call `.wrap_node("detailsContent", ...)` on the returned view and wrap the supplied editable content.
 
 ## Commands
 

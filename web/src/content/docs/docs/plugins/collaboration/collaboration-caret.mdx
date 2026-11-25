@@ -13,38 +13,69 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 
 ## Install
 
-Start with the two synchronized sessions in the [Collaboration example](/docs/plugins/collaboration/collaboration/). Add the caret crate to that project.
+Start with the project from the [Collaboration example](/docs/plugins/collaboration/collaboration/). Add the caret crate to that project.
 
 ```sh
 cargo add gpdoc-plugin-collaboration-caret
 ```
 
-## Draw remote selections in GPUI
+## Example
 
-Install the caret plugin with `cargo add gpdoc-plugin-collaboration-caret`. Register `collaboration_carets` on an editor with the schema used by the collaboration session. The supplied function resolves remote selections against that session on each paint.
+Start with Alice’s session and its `seed` update from the [Collaboration example](/docs/plugins/collaboration/collaboration/#example). Replace the line that creates Bob’s session with the following setup. The painter and the receive handler share Bob’s awareness state.
 
 ```rust
-use gpdoc::EditorConfig;
-use gpdoc_plugin_collaboration_caret::collaboration_carets;
-use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_collaboration_caret::{CollaborationCaret, collaboration_carets, paint_remote_caret};
+use std::{cell::{OnceCell, RefCell}, rc::Rc};
 
-let peers = collaboration_carets(move |session| awareness.borrow().peers(session));
-let config = EditorConfig::builder()
+let awareness = Rc::new(OnceCell::<RefCell<CollaborationCaret>>::new());
+let remote_carets = Rc::clone(&awareness);
+let peers = collaboration_carets(move |session| {
+    remote_carets.get().map_or_else(Vec::new, |state| state.borrow().peers(session))
+});
+let bob_config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(peers)
-    .build()?;
+    .plugin(peers.with_view(paint_remote_caret))
+    .build()
+    .expect("configure editor");
+let bob = Collaboration::from_update(&bob_config, "default", &seed)?;
+let remote = awareness.get_or_init(|| RefCell::new(CollaborationCaret::new(&bob)));
 ```
 
-Pass your own paint function to `with_view` to customize the selection, cursor or label. It receives the `CaretPart`, the peer's awareness data and measured geometry in `CaretLayout`, and the GPUI window and app. Call `paint_remote_caret` for the parts you want to keep. The selection paints behind the document text and the cursor and label above it.
+The snippets below inspect Bob’s session before binding it. To display the caret, open the view with `bob_config` and pass `bob` to `view.bind_collaboration(bob, send_update, window, cx)?`. After binding, use the session from `view.collaboration()` for lookup and notify the view after each awareness update. See [Connect a GPUI view](/docs/plugins/collaboration/collaboration/#connect-a-gpui-view).
 
-Here `awareness` is the app's shared `Rc<RefCell<CollaborationCaret>>`. Bind the editor session as shown in [Connect a GPUI view](/docs/plugins/collaboration/collaboration/#connect-a-gpui-view). After receiving an awareness update, notify the bound view so it can repaint.
+## Compose a remote caret
+
+### Anatomy
+
+```text
+peers.with_view(...)      Receives each part and its measured CaretLayout
+├── CaretPart::Selection  Highlight rectangles behind the selected text
+├── CaretPart::Cursor     Insertion line at the remote selection head
+└── CaretPart::Label      Name above the cursor
+```
+
+### Show the remote selection and cursor
+
+Replace `paint_remote_caret` in the example's `with_view` call with `paint_peer`. Forward the selection and cursor to the default painter to display a peer's editing position without a name label.
+
+```rust
+use gpdoc_plugin_collaboration_caret::{CaretLayout, CaretPart};
+use gpui::{App, Window};
+
+fn paint_peer(part: CaretPart, caret: &CaretLayout, window: &mut Window, cx: &mut App) {
+    match part {
+        CaretPart::Selection | CaretPart::Cursor => paint_remote_caret(part, caret, window, cx),
+        CaretPart::Label => {}
+    }
+}
+```
 
 ## Show Alice's caret in Bob's editor
 
-Add this import to the collaboration example. Place the remaining snippets inside `main`, before `Ok(())`.
+Use Alice’s session and the shared receiver from the example above.
 
 ```rust
-use gpdoc_plugin_collaboration_caret::{CollaborationCaret, User};
+use gpdoc_plugin_collaboration_caret::User;
 ```
 
 ### `CollaborationCaret::new`
@@ -53,7 +84,6 @@ Create one awareness instance for each session and keep it while that peer is co
 
 ```rust
 let mut local = CollaborationCaret::new(&alice);
-let mut remote = CollaborationCaret::new(&bob);
 let user = User::from_iter([("name".into(), "Alice".into())]);
 ```
 
@@ -65,7 +95,7 @@ Place Alice's caret at the start of the paragraph. With `focused` set to `true`,
 let selection = Selection::caret(DocPos(1));
 alice.select(selection)?;
 let update = local.publish(&alice, user.clone(), true)?;
-remote.receive(&update)?;
+remote.borrow_mut().receive(&update)?;
 ```
 
 ### `peers` and `RemoteCaret`
@@ -73,7 +103,7 @@ remote.receive(&update)?;
 Call `peers` as the view paints so a remote selection resolves against the current text. The result is a `Vec<RemoteCaret>` sorted by `client`, a `yrs::ClientID` that distinguishes users even if they share a name. Use `user` to draw a label and `selection` to draw a caret or range. A hidden or unresolved selection yields `None`.
 
 ```rust
-let peers = remote.peers(&bob);
+let peers = remote.borrow().peers(&bob);
 assert_eq!(peers.len(), 1);
 assert_eq!(peers[0].user["name"], "Alice");
 assert_eq!(peers[0].selection, Some(selection));
@@ -87,8 +117,8 @@ On focus loss, publish the same user with `focused` set to `false`. Bob can stil
 
 ```rust
 let hidden = local.publish(&alice, user, false)?;
-remote.receive(&hidden)?;
-assert_eq!(remote.peers(&bob)[0].selection, None);
+remote.borrow_mut().receive(&hidden)?;
+assert_eq!(remote.borrow().peers(&bob)[0].selection, None);
 ```
 
 ### `leave`
@@ -96,11 +126,9 @@ assert_eq!(remote.peers(&bob)[0].selection, None);
 Before closing the connection, send the update returned by `leave`. Once Bob receives it, Alice disappears from his peer list. Keep these presence messages transient and route saved document edits through `Collaboration::apply_update`.
 
 ```rust
-remote.receive(&local.leave()?)?;
-assert!(remote.peers(&bob).is_empty());
+remote.borrow_mut().receive(&local.leave()?)?;
+assert!(remote.borrow().peers(&bob).is_empty());
 ```
-
-Run `cargo run`. The assertions check the caret's position, its disappearance on focus loss, and Alice's removal from Bob's peer list.
 
 ## Source code
 

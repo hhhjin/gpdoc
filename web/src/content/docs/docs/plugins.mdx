@@ -7,7 +7,7 @@ tableOfContents: false
 import PluginCatalog from "../../../components/PluginCatalog.astro";
 import ParagraphExample from "../../../components/ParagraphExample.astro";
 
-Choose a plugin for install commands and Rust examples. Pages with a browser demo let you try the behavior in place. The source links open the Rust implementation used to build these docs. Set up a Cargo project in the [Quickstart](/docs/quickstart/#create-a-rust-project).
+Choose a plugin to see how to register it in the [Quickstart editor](/docs/quickstart/#configure-the-editor). For plugins with UI components, the Compose section shows how to assemble their parts in your own view.
 
 <PluginCatalog />
 
@@ -37,7 +37,9 @@ let config = gpdoc::EditorConfig::builder()
     .build()?;
 ```
 
-An empty paragraph shows the writing hint. In a document with adjacent closed blocks, click their boundary to place the gap cursor. To change how a plugin looks, define a view in your application and register it with `.with_view(...)`. See [Style a paragraph](/docs/quickstart/#style-a-paragraph) and [Register your slash commands](/docs/plugins/behavior/slash-command/#register-your-commands).
+An empty paragraph shows the writing hint. In a document with adjacent closed blocks, click their boundary to place the gap cursor. To change how a plugin looks, define a view in your application and register it with `.with_view(...)`.
+
+For an editable block, [wrap the paragraph content in a GPUI element](/docs/quickstart/#style-a-paragraph). For a menu, [compose a slash command picker](/docs/plugins/behavior/slash-command/#compose-a-slash-menu) with your own panel and rows. To put an action above the caret, [add a button to a link popover](/docs/plugins/formatting/link/#compose-a-link-popover).
 
 ## Format a selection
 

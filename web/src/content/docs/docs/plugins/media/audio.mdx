@@ -19,53 +19,57 @@ cargo add gpdoc-plugin-audio
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), insert an audio node that references a relative path.
+Register an audio view with a play button in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_audio::audio;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_audio::{audio, audio_controls};
 use gpdoc_plugin_paragraph::paragraph;
+use gpui::prelude::*;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(audio(Default::default()))
-    .build()?;
-let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
-editor.run(gpdoc_plugin_audio::Set {
-    src: "./media/interview.ogg".into(),
-    muted: Some(true),
-    ..Default::default()
-})?;
-
-let block = &editor.document().blocks()[0];
-assert_eq!(block.kind, "audio");
-assert_eq!(block.attrs["muted"], true);
-```
-
-The empty paragraph becomes an audio block. The document keeps the path exactly as supplied. Give the host access to the file at that path when you want to play it.
-
-## Native view
-
-Registering `audio(Default::default())` displays the source label and enables native media activation. To supply playback controls, pass your view function to `with_view`.
-
-```rust
-use gpdoc::{PluginViewExt, ViewPlugin};
-use gpdoc_plugin_audio::{AudioNode, audio, audio_controls};
-use gpui::prelude::*;
+    .plugin(audio(Default::default()).with_view(player))
+    .build()
+    .expect("configure editor");
 
 fn player() -> ViewPlugin {
-    audio_controls(|clip: AudioNode<'_>, _, cx| {
-        clip.play_button(cx).child("▶ Play")
-    })
+    audio_controls(|clip, _, cx| clip.play_button(cx).child("Play"))
 }
-
-let config = gpdoc::EditorConfig::builder()
-    .plugin(gpdoc_plugin_paragraph::paragraph())
-    .plugin(audio(Default::default()).with_view(player))
-    .build()?;
 ```
 
-The play button opens the clip in the system handler. It resolves relative paths against the editor's media base URL and activates HTTP(S) sources. Use `clip.source()` and `clip.slot.node.attrs` for an application-owned player.
+Paste an HTTP(S) URL ending in `.ogg` into an empty paragraph. Click **Play** to open the clip in the system handler.
+
+## Compose an audio button
+
+The default GPUI view displays the source in the document. Use `audio_controls` to place your own control inside the space that label occupies.
+
+### Anatomy
+
+```text
+audio_controls(...)       Supplies an AudioNode for each clip
+└── clip.play_button(cx)  Opens the resolved audio URL
+    └── child(...)        Your button label
+```
+
+### Show the filename on the play button
+
+Replace `player` in the example above. Read the filename from the stored source and put it inside the existing play button.
+
+```rust
+fn player() -> ViewPlugin {
+    audio_controls(|clip, _, cx| {
+        let name = clip.source()
+            .filter(|src| !src.starts_with("data:"))
+            .and_then(|src| src.rsplit('/').next())
+            .filter(|name| !name.is_empty())
+            .unwrap_or("Audio");
+        clip.play_button(cx).child(format!("▶ {name}"))
+    })
+}
+```
+
+For `./media/interview.ogg`, the button reads **▶ interview.ogg**. Set an HTTP(S) base with `EditorView::set_media_base_url` to resolve relative paths. Clicking the button opens the resolved HTTP(S) URL in the system handler. An in-app player can read the original source from `clip.source()` and the playback attributes from `clip.slot.node.attrs`.
 
 ## Settings
 
@@ -144,13 +148,14 @@ Inserts at the caret or replaces the current selection. Supply `src` as an HTTP(
 ```rust
 editor.run(gpdoc_plugin_audio::Set {
     src: "./media/interview.ogg".into(),
+    muted: Some(true),
     ..Default::default()
 })?;
 ```
 
 Override config defaults for a single clip with the boolean attributes `controls`, `autoplay`, `loop`, `muted`, and `disableremoteplayback`, or with the string `preload`. The optional strings `controlslist` and `crossorigin` accept null and are omitted by default.
 
-Pasting a web URL ending in a recognized suffix such as `.mp3` or `.ogg` also inserts an audio node. GPUI opens playback in the system handler. Use `Editor::set_media_base_url` to resolve relative sources.
+Pasting a web URL ending in a recognized suffix such as `.mp3` or `.ogg` also inserts an audio node. GPUI opens playback in the system handler. Use `EditorView::set_media_base_url` to resolve relative sources.
 
 ## Source code
 

@@ -19,85 +19,76 @@ cargo add gpdoc-plugin-mention
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), type a query and accept a user selected by the host.
+Register the mention picker alongside the paragraph plugin in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Node, Value};
-use gpdoc_plugin_mention::{mention, Mention, Accept, DeleteBackward};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_mention::{Mention, MentionCatalog, MentionMenu, mention, mention_catalog_picker};
 use gpdoc_plugin_paragraph::paragraph;
 
+let people = MentionCatalog::new([
+    Mention::new("user-42", "Ada"),
+    Mention::new("user-57", "Alex"),
+]);
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(mention())
-    .build()?;
-let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
-editor.insert_text("@Ad")?;
-editor.run(Accept(Mention::new("user-42", "Ada")))?;
+    .plugin(mention().with_metadata(people).with_view(people_views))
+    .build()
+    .expect("configure editor");
 
-let mention = editor.document().node_at(DocPos(1)).unwrap();
-assert_eq!(mention.kind, "mention");
-assert_eq!(mention.attrs["id"], Value::String("user-42".into()));
-```
-
-The example keeps a stable record ID, `user-42`, alongside the label shown to readers. The typed query disappears, and the caret moves past the space following the mention.
-
-## Compose the picker and inserted chip
-
-Registering `mention()` displays each stored trigger and label, such as `@Ada`. Its default picker searches the records contributed by installed plugins. The menu appears only when a query matches a record.
-
-For a fixed list, contribute a `MentionCatalog` to the config. Users can navigate the plain text list with arrow keys and accept a record with Enter or a click.
-
-```rust
-use gpdoc_plugin_mention::{Mention, MentionCatalog, mention};
-
-let people = MentionCatalog::new([Mention::new("user-42", "Ada")]);
-let config = gpdoc::EditorConfig::builder()
-    .plugin(gpdoc_plugin_paragraph::paragraph())
-    .plugin(mention().with_metadata(people))
-    .build()?;
-```
-
-For application search or a different row layout, pass a view function from your own module.
-
-```rust
-use gpdoc::PluginViewExt;
-use gpdoc_plugin_mention::mention;
-
-mod menus;
-
-let config = gpdoc::EditorConfig::builder()
-    .plugin(gpdoc_plugin_paragraph::paragraph())
-    .plugin(mention().with_view(menus::mention_menu))
-    .build()?;
-```
-
-In `menus.rs`, supply your search function and compose each result from the matching mention record.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_mention::{Mention, MentionMenu, mention_picker};
-use gpui::{prelude::*, rgb};
-
-pub fn mention_menu() -> ViewPlugin {
-    mention_picker(people, |menu: MentionMenu, _, _| {
-        menu.popover(menu.list(6, |row| {
-            row.element()
-                .when(row.is_active(), |el| el.bg(rgb(0xdde9f8)))
-                .child(row.value.label.clone().unwrap_or_default())
-        }).bg(rgb(0xffffff)))
-    })
+fn person_name(person: &Mention) -> String {
+    person.label.as_ref().or(person.id.as_ref()).cloned().unwrap_or_default()
 }
 
-fn people(query: &str) -> Vec<Mention> {
-    let query = query.to_lowercase();
-    ["Ada", "Lin", "Sam"].into_iter()
-        .filter(|name| name.to_lowercase().starts_with(&query))
-        .map(|name| Mention::new(name.to_lowercase(), name))
-        .collect()
+fn people_views() -> ViewPlugin {
+    mention_catalog_picker(|menu: MentionMenu, _, _| menu.labeled_list(person_name))
 }
 ```
 
-To use your own rows with the installed catalogs, call `mention_catalog_picker(render)`. The stored mention label remains visible with either picker. To customize the inserted chip, return `[mention_chip(render_chip), mention_picker(people, render_menu)]` from your view function. The chip renderer receives a `MentionChip` with the stored ID, trigger, label and attributes.
+Run the app and type `@A`. Press **Down** to move from **Ada** to **Alex**, then **Enter** to insert `@Alex`. The mention stores Alex's ID, `user-57`, and the caret lands after a space.
+
+## Compose a mention picker and chip
+
+Build the picker from a popover, a list, and a row for each match. A separate chip view renders the mention in the document after the user picks a person.
+
+### Anatomy
+
+```text
+mention_catalog_picker(...)   Finds matching records in the installed catalogs
+└── menu.popover(...)         Anchors the menu below the caret
+    └── menu.list(6, ...)     Shows up to six matches, including the active row
+        └── row.element()     Accepts a record on click and keeps editor focus
+
+mention_chip(...)             Receives the inserted mention
+└── div()                     Your chip inside the measured mention label
+```
+
+### Assemble the picker and chip
+
+In the example above, add the imports below and replace `people_views`. Put the name inside `row.element()` so clicking the name accepts the match.
+
+```rust
+use gpdoc_plugin_mention::mention_chip;
+use gpui::{div, prelude::*};
+
+fn people_views() -> [ViewPlugin; 2] {
+    let picker = mention_catalog_picker(|menu: MentionMenu, _, _| {
+        let list = menu.list(6, |row| {
+            row.element().child(person_name(row.value))
+        });
+        menu.popover(list)
+    });
+
+    let chip = mention_chip(|chip, _, _| {
+        div().child(format!("{}{}", chip.trigger(), chip.label()))
+    });
+    [picker, chip]
+}
+```
+
+Type `@Ad` and press **Enter** or click **Ada**. The picker closes and the chip displays `@Ada` in the paragraph.
+
+For application-owned search, use `mention_picker(search, render)` with the same menu renderer. The search function receives the query text and returns a `Vec<Mention>`.
 
 ## Settings
 
@@ -116,6 +107,8 @@ let mention = gpdoc_plugin_mention::mention_with_backspace(true);
 Replaces the active query with a mention and one space. The caret must be at the end of the query. The default trigger matches at the start of the text or after a space. Use the [Suggestion helper](/docs/plugins/behavior/suggestion/) to match the query while your picker is open.
 
 ```rust
+use gpdoc_plugin_mention::{Accept, Mention};
+
 editor.run(Accept(Mention::new("user-42", "Ada")))?;
 ```
 
@@ -126,7 +119,7 @@ The optional strings `id` and `label` both default to null. The view displays th
 With a caret immediately after a mention, replaces that mention with its trigger or deletes it according to `delete_trigger`. Takes no arguments. Both mention commands return `CommandOutcome::NotApplicable` if the selection does not meet their requirements.
 
 ```rust
-editor.run(DeleteBackward)?;
+editor.run(gpdoc_plugin_mention::DeleteBackward)?;
 ```
 
 ## Keyboard shortcuts

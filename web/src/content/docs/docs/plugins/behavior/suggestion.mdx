@@ -16,14 +16,81 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 Run this from a [Quickstart project](/docs/quickstart/).
 
 ```sh
-cargo add gpdoc-plugin-suggestion
+cargo add gpdoc-plugin-suggestion gpdoc-plugin-mention
 ```
 
-## Show a picker in GPUI
+## Example
 
-The [mention picker](/docs/plugins/media/mention/#compose-the-picker-and-inserted-chip) and [slash picker](/docs/plugins/behavior/slash-command/#register-your-commands) share the suggestion list, keyboard navigation, and click handling. Each editor keeps its own active item and dismissed query.
+Use the Mention plugin's inline node and `Accept` command to complete topic tags. The matcher finds a `#` query at the caret. The provider pairs each matching name with the command that inserts its tag.
 
-For another trigger, use `suggestion_picker(name, matcher, items, render)` inside your plugin's view function. The matcher returns a `SuggestionMatch` for the active query. For each candidate, return a `SuggestionItem::new(value, command)`. For a plain picker, return `menu.labeled_list(|value| value.name.clone())` when your record has a `name: String` field. For a custom layout, the render function receives the typed values through `menu.list(...)` and anchors its content with `menu.popover(...)`. Attach the view with `.plugin(my_plugin().with_view(my_menu))` after importing `gpdoc::PluginViewExt`.
+```rust
+use gpdoc::{AnchoredElement, EditorConfig, PluginViewExt, ViewPlugin};
+use gpdoc_plugin_mention::{Accept, Mention, mention};
+use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_suggestion::{SuggestionItem, SuggestionMenu, Trigger, suggestion_picker};
+use gpui::{App, Window};
+
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(mention().with_view(topic_picker))
+    .build()
+    .expect("configure editor");
+
+fn topic_picker() -> ViewPlugin {
+    suggestion_picker(
+        "topicPicker",
+        |editor| Trigger::new('#').find(editor.document(), editor.selection()),
+        |_, matched| {
+            ["design", "docs", "release"]
+                .into_iter()
+                .filter(|name| name.starts_with(&matched.query))
+                .map(|name| {
+                    let mut tag = Mention::new(name, name);
+                    tag.trigger = '#';
+                    SuggestionItem::new(name, Accept(tag))
+                })
+                .collect()
+        },
+        render_topics,
+    )
+}
+
+fn render_topics(menu: SuggestionMenu<&'static str>, _: &mut Window, _: &mut App) -> AnchoredElement {
+    menu.labeled_list(|name| name.to_string())
+}
+```
+
+Type `#d` at the start of a paragraph. Press **Down** to select **docs**, then **Enter** to insert `#docs` followed by a space.
+
+## Compose a suggestion picker
+
+Use `menu.list` to display matching records and track the active row. The picker handles arrow keys, Enter, and Escape.
+
+### Anatomy
+
+```text
+menu.popover(...)          Anchors the list below the caret
+└── menu.list(4, ...)      Keeps the active row within four visible matches
+    └── row.element()      Accepts the candidate on click and keeps editor focus
+```
+
+### Show a picker in GPUI
+
+Replace `render_topics` with a list that prefixes each name with the tag character. Read `row.value` for the name and `row.is_active()` for the current keyboard selection.
+
+```rust
+use gpui::prelude::*;
+
+fn render_topics(menu: SuggestionMenu<&'static str>, _: &mut Window, _: &mut App) -> AnchoredElement {
+    let list = menu.list(4, |row| {
+        let marker = if row.is_active() { "› " } else { "" };
+        row.element().child(format!("{marker}#{}", row.value))
+    });
+    menu.popover(list)
+}
+```
+
+Type `#d` and click **#docs** to insert the tag. For pickers that already supply the matcher and candidates, see [Mention](/docs/plugins/media/mention/) and [Slash command](/docs/plugins/behavior/slash-command/#compose-a-slash-menu).
 
 ## Read a mention query at the caret
 

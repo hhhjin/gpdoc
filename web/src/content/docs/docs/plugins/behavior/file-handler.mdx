@@ -11,13 +11,13 @@ Copy an image, click the paragraph, and paste. The example reports how many imag
 
 <ViewPluginExample plugin="file-handler" title="File handler example" />
 
-## Register the plugin
-
-In the [Quickstart app](/docs/quickstart/#configure-the-editor), add the crate and register its input handler with the editor.
+## Install
 
 ```sh
 cargo add gpdoc-plugin-file-handler
 ```
+
+## Example
 
 ```rust
 use gpdoc_plugin_file_handler::{FileInput, file_handler};
@@ -35,7 +35,8 @@ let files = file_handler(|_, input, _, _| match input {
 let config = gpdoc::EditorConfig::builder()
     .plugin(gpdoc_plugin_paragraph::paragraph())
     .plugin(files)
-    .build()?;
+    .build()
+    .expect("configure editor");
 ```
 
 Drop a file or paste an image to log the event. Replace the logging with your app's import logic. For a drop, `at` is the destination document position. A paste supplies the clipboard images and the callback can read the current selection from the editor.

@@ -11,7 +11,7 @@ Hover over “Collect feedback” and use the handle on the left to move the who
 
 <ViewPluginExample plugin="drag-handle" title="Drag handle example" />
 
-## Register the plugin
+## Install
 
 Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
 
@@ -19,17 +19,53 @@ Add the crate to your [Quickstart app](/docs/quickstart/#configure-the-editor).
 cargo add gpdoc-plugin-drag-handle
 ```
 
+## Example
+
+Pass `block_grip` to display the built-in grip in the gutter and in the drag preview.
+
 ```rust
-use gpdoc_plugin_drag_handle::drag_handle;
+use gpdoc::EditorConfig;
+use gpdoc_plugin_drag_handle::{block_grip, drag_handle};
 use gpdoc_plugin_paragraph::paragraph;
 
-let config = gpdoc::EditorConfig::builder()
+let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(drag_handle())
-    .build()?;
+    .plugin(drag_handle().with_view(block_grip))
+    .build()
+    .expect("configure editor");
 ```
 
-To customize the handle and drag preview, pass a renderer to `drag_handle().with_view(...)`.
+Hover over a paragraph and drag the grip to move it.
+
+## Compose the grip and drag preview
+
+The plugin finds the block under the pointer, starts the drag, and moves the block on drop. Its renderer receives a `DragHandleSlot` for each of the two places your element can appear.
+
+### Anatomy
+
+```text
+drag_handle().with_view(...)
+├── DragHandlePart::Grip     Inside the draggable target in the left gutter
+└── DragHandlePart::Preview  Follows the pointer during a drag
+```
+
+### Show a label while dragging
+
+In the example, replace `.with_view(block_grip)` with `.with_view(render_handle)`.
+
+```rust
+use gpdoc_plugin_drag_handle::{DragHandlePart, DragHandleSlot};
+use gpui::{App, Div, Window, div, prelude::*};
+
+fn render_handle(slot: DragHandleSlot, _: &mut Window, _: &mut App) -> Div {
+    match slot.part {
+        DragHandlePart::Grip => div().child("⠿"),
+        DragHandlePart::Preview => div().child("Move block"),
+    }
+}
+```
+
+Hover over a paragraph to reveal the grip. Drag it to another paragraph and the **Move block** label follows the pointer until you drop it.
 
 ## Source code
 

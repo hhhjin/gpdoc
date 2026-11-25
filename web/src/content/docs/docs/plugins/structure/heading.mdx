@@ -17,21 +17,64 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 cargo add gpdoc-plugin-heading
 ```
 
-Register `heading()` with `paragraph()` so users can toggle a heading back to body text.
+## Example
 
-## Convert a paragraph to a level 2 heading
-
-In a [Quickstart project](/docs/quickstart/), convert a paragraph to a level 2 heading.
+Register paragraphs and headings so users can toggle between them. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node, Value};
-use gpdoc_plugin_heading::{heading, Level, Set, Toggle};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_heading::{heading, heading_block};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(heading())
-    .build()?;
+    .plugin(heading().with_view(heading_view))
+    .build()
+    .expect("configure editor");
+
+fn heading_view() -> ViewPlugin {
+    heading_block(|block, _, _| block.content)
+}
+```
+
+Press **Mod + Alt + 2** in a paragraph to turn it into a level-two heading.
+
+## Compose a heading
+
+The renderer receives the heading node and its editable contents. Read the level from the node when choosing how to display the heading.
+
+### Anatomy
+
+```text
+heading_block(...)
+└── div()              Your wrapper
+    ├── label          Level read from the heading node
+    └── block.content  Editable heading text
+```
+
+### Read the heading level
+
+Replace `heading_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn heading_view() -> ViewPlugin {
+    heading_block(|block, _, _| {
+        let level = block.node.attrs.get("level").and_then(|value| value.as_u64()).unwrap_or(1);
+        div().flex().child(format!("H{level}")).child(block.content)
+    })
+}
+```
+
+Use `block.node.attrs` to read the level. This wrapper displays the level beside the editable heading.
+
+## Convert a paragraph to a level 2 heading
+
+```rust
+use gpdoc::{Editor, Node, Value};
+use gpdoc_plugin_heading::{Level, Set};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Release notes")])?;
 editor.run(Set(Level::H2))?;
 assert_eq!(editor.document().blocks()[0].attrs["level"], Value::from(2));
@@ -64,7 +107,7 @@ If every selected block is a heading of the requested level, convert them to par
 
 ```rust
 let level = Level::H2;
-editor.run(Toggle(level))?;
+editor.run(gpdoc_plugin_heading::Toggle(level))?;
 ```
 
 ## Keyboard shortcuts
@@ -72,28 +115,6 @@ editor.run(Toggle(level))?;
 | Shortcut | Action |
 | --- | --- |
 | **Mod + Alt + 1** through **Mod + Alt + 6** | Toggle the corresponding heading level. |
-
-## Compose a GPUI view
-
-Headings inherit the editor’s typography by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(heading().with_view(views::heading))
-```
-
-In `views.rs`, place the editable content once. Read the heading level from `block.node.attrs` to choose typography for each level. The document plugin stores the level.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_heading::heading_block;
-use gpui::{div, prelude::*};
-
-pub fn heading() -> ViewPlugin {
-    heading_block(|block, _, _| {
-        div().font_weight(gpui::FontWeight::BOLD).child(block.content)
-    })
-}
-```
 
 ## Source code
 

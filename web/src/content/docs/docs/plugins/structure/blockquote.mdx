@@ -17,21 +17,59 @@ import PluginExample from "../../../../../components/PluginExample.astro";
 cargo add gpdoc-plugin-blockquote
 ```
 
-Register `blockquote()` alongside `paragraph()`. A quote takes no attributes and holds one or more child blocks.
+## Example
 
-## Wrap a paragraph
-
-In a [Quickstart project](/docs/quickstart/), wrap a paragraph, then unwrap it again.
+Register the quote alongside the paragraph it can wrap. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_blockquote::blockquote;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_blockquote::{blockquote, quote_block};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(blockquote())
-    .build()?;
+    .plugin(blockquote().with_view(quote_view))
+    .build()
+    .expect("configure editor");
+
+fn quote_view() -> ViewPlugin {
+    quote_block(|block, _, _| block.content)
+}
+```
+
+At the start of a paragraph, type `>` followed by a space. The paragraph becomes the first block in the quote.
+
+## Compose a blockquote
+
+Place the quoted blocks inside one wrapper. Nested paragraphs and lists keep their block views.
+
+### Anatomy
+
+```text
+quote_block(...)
+└── div()              Your wrapper
+    └── block.content  Editable paragraphs, lists, and nested quotes
+```
+
+### Wrap the quoted blocks
+
+Replace `quote_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn quote_view() -> ViewPlugin {
+    quote_block(|block, _, _| {
+        div().child(block.content)
+    })
+}
+```
+
+## Wrap a paragraph
+
+```rust
+use gpdoc::{Editor, Node};
+
 let paragraph = Node::text("paragraph", "The launch is on Friday.");
 let mut editor = Editor::from_document(&config, vec![paragraph.clone()])?;
 
@@ -77,28 +115,6 @@ editor.run(gpdoc_plugin_blockquote::Toggle)?;
 ## Start a quote while typing
 
 Type `>` followed by a space at the start of a paragraph. The editor removes the marker and wraps the paragraph.
-
-## Compose a GPUI view
-
-Blockquotes display their editable children in document order by default. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(blockquote().with_view(views::quote))
-```
-
-In `views.rs`, place the editable content once. The content contains the original editable blocks, including nested lists and quotations.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_blockquote::quote_block;
-use gpui::{div, prelude::*, px};
-
-pub fn quote() -> ViewPlugin {
-    quote_block(|block, _, _| {
-        div().border_l_2().pl(px(12.)).child(block.content)
-    })
-}
-```
 
 ## Source code
 

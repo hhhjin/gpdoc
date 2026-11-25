@@ -19,18 +19,62 @@ cargo add gpdoc-plugin-task-list
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), register both plugins and create a checked item by typing its Markdown marker.
+Register the checklist container and its clickable task rows. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node, Value};
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
-use gpdoc_plugin_task_list::{task_item, task_list};
+use gpdoc_plugin_task_list::{TaskRow, task_item, task_list, task_rows};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(task_item())
+    .plugin(task_item().with_view(task_view))
     .plugin(task_list())
-    .build()?;
+    .build()
+    .expect("configure editor");
+
+fn task_view() -> ViewPlugin {
+    task_rows(TaskRow::render)
+}
+```
+
+Type `[x]` followed by a space to start a completed task. Click its checkbox to clear the checked state.
+
+## Compose a GPUI checklist
+
+Each task row receives the checked state, a checkbox that updates the document, and the editable task body.
+
+### Anatomy
+
+```text
+task_rows(...)
+└── div()              Task row
+    ├── task.checkbox  Toggles the checked state and focuses the editor
+    └── task.content   Editable task body
+```
+
+### Assemble the checkbox and task body
+
+Replace `task_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn task_view() -> ViewPlugin {
+    task_rows(|task, _, _| {
+        let mark = if task.checked { "☑" } else { "☐" };
+        div().flex().child(task.checkbox.child(mark)).child(task.content)
+    })
+}
+```
+
+Put the glyph inside `task.checkbox` so clicking it toggles the task.
+
+## Create a checked task
+
+```rust
+use gpdoc::{Editor, Node, Value};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "")])?;
 editor.insert_text("[x] ")?;
 editor.insert_text("Write the release notes")?;
@@ -63,42 +107,6 @@ let config = EditorConfig::builder()
 ### `checked`
 
 A boolean on each `taskItem`, default `false`. Completion survives a document JSON round trip.
-
-## Compose a GPUI checklist
-
-With the `gpui` feature, `task_item()` places a clickable checkbox beside each editable item. Attach your own view to replace the default row.
-
-```rust
-use gpdoc::PluginViewExt;
-use gpdoc_plugin_paragraph::paragraph;
-use gpdoc_plugin_task_list::{task_item, task_list};
-
-mod views;
-
-let config = gpdoc::EditorConfig::builder()
-    .plugin(paragraph())
-    .plugin(task_list())
-    .plugin(task_item().with_view(views::checklist))
-    .build()?;
-```
-
-In `views.rs`, compose each row with its checkbox and editable body. The checkbox updates the document and restores editor focus. Place the supplied body once so it retains its text editing and selection behavior.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_task_list::task_rows;
-use gpui::{div, prelude::*, px};
-
-pub fn checklist() -> ViewPlugin {
-    task_rows(|task, _, _| {
-        div().flex().gap(px(8.))
-            .child(task.checkbox.child(if task.checked { "☑" } else { "☐" }))
-            .child(div().flex_1().min_w_0().child(task.content))
-    })
-}
-```
-
-Use `task_rows(TaskRow::render)` with `TaskRow` from the task list crate for the styled square checkbox layout.
 
 ## Commands
 

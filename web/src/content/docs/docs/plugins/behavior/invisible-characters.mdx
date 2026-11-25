@@ -11,28 +11,58 @@ Click after “Two words” and press **Space** to add a space marker. Press **E
 
 <ViewPluginExample plugin="invisible-characters" title="Invisible characters example" />
 
-## Register the plugin
-
-Register the plugin in the [Quickstart app](/docs/quickstart/#configure-the-editor).
+## Install
 
 ```sh
 cargo add gpdoc-plugin-invisible-characters
 ```
 
+## Example
+
 ```rust
-use gpdoc::EditorConfig;
-use gpdoc_plugin_invisible_characters::invisible_characters;
+use gpdoc::{EditorConfig, PluginViewExt};
+use gpdoc_plugin_invisible_characters::{character_markers, invisible_characters, paint_marker};
 use gpdoc_plugin_paragraph::paragraph;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
-    .plugin(invisible_characters(true))
-    .build()?;
+    .plugin(invisible_characters(true).with_view(|| character_markers(paint_marker)))
+    .build()
+    .expect("configure editor");
 ```
 
-The document plugin stores visibility for each editor. Pass `true` to show markers when the editor opens, or `false` to start with them hidden. The view paints the markers over the document. To draw your own glyphs, use `invisible_characters(true).with_view(|| character_markers(your_painter))`. Each `CharacterMarker` supplies its `MarkerKind`, UTF-16 document position and measured bounds. Use `frame.paint_text` to match the editor font.
+The document plugin stores visibility for each editor. Pass `true` to show markers when the editor opens, or `false` to start with them hidden. The view paints the markers over the document.
 
 Run `toggleInvisibleCharacters` to switch visibility. Use `showInvisibleCharacters` or `hideInvisibleCharacters` to set it explicitly. These commands preserve the document's text.
+
+## Compose character markers
+
+### Anatomy
+
+```text
+invisible_characters(true).with_view(...)  Starts with the markers visible
+└── character_markers(...)                 Calls your painter for each visible marker
+    ├── marker.kind                        Space, LineBreak, or ParagraphEnd
+    └── marker.bounds                      Where to paint the glyph
+```
+
+### Show only paragraph ends
+
+Pass `paragraph_end` to `character_markers` in the example. Use the marker kind to choose which glyphs reach the default painter.
+
+```rust
+use gpdoc::DecorationFrame;
+use gpdoc_plugin_invisible_characters::{CharacterMarker, MarkerKind};
+use gpui::{App, Window};
+
+fn paragraph_end(marker: CharacterMarker, frame: &DecorationFrame<'_>, window: &mut Window, cx: &mut App) {
+    if marker.kind == MarkerKind::ParagraphEnd {
+        paint_marker(marker, frame, window, cx);
+    }
+}
+```
+
+Type two words separated by a space and press **Enter**. A **¶** appears at the end of each paragraph.
 
 ## Source code
 

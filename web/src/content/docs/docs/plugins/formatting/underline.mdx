@@ -13,41 +13,27 @@ Underline adds the `underline` mark. It can mark a label in a worksheet or a ter
 
 ## Install
 
-From your [Quickstart project](/docs/quickstart/), add the plugin.
-
 ```sh
 cargo add gpdoc-plugin-underline
 ```
 
-Register `gpdoc_plugin_underline::underline()` alongside `paragraph()`.
-
 ## Example
 
-The first paragraph starts at document position `1`. The range `1..5` selects `Sign`. Put the example in the Quickstart project's `src/main.rs`. Run `cargo run` to print the edited paragraph as JSON.
+Register the underline formatter in the [Quickstart editor configuration](/docs/quickstart/#configure-the-editor). `underline()` uses this formatter by default.
 
 ```rust
-use gpdoc::{DocPos, Editor, EditorConfig, Error, Node, Selection};
-use gpdoc_plugin_underline::underline;
+use gpdoc::{EditorConfig, PluginViewExt};
+use gpdoc_plugin_underline::{underline, underline_format};
 use gpdoc_plugin_paragraph::paragraph;
 
-fn main() -> Result<(), Error> {
-	let config = EditorConfig::builder()
-	    .plugin(paragraph())
-	    .plugin(underline())
-	    .build()?;
-	let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Sign and date this form.")])?;
-	editor.select(Selection::Text {
-		anchor: DocPos(1),
-		head: DocPos(5),
-	})?;
-
-	editor.run(gpdoc_plugin_underline::Toggle)?;
-	println!("{}", editor.document().blocks()[0].to_json());
-	Ok(())
-}
+let config = EditorConfig::builder()
+    .plugin(paragraph())
+    .plugin(underline().with_view(underline_format))
+    .build()
+    .expect("configure editor");
 ```
 
-The line runs under `Sign`. The underline mark carries no link destination.
+Select a word and press **Command + U** on macOS or **Ctrl + U** on Windows and Linux. A line appears beneath the word.
 
 ## Commands
 
@@ -80,7 +66,3 @@ editor.run(gpdoc_plugin_underline::Unset)?;
 ## Keyboard shortcuts
 
 Toggle underline with **Command + U** on macOS or **Ctrl + U** on Windows and Linux.
-
-## Native appearance
-
-In a GPUI editor, `underline()` underlines marked text. To supply your own formatter, import `gpdoc::PluginViewExt` and register `underline().with_view(my_underline_view)`.

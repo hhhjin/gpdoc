@@ -19,20 +19,32 @@ cargo add gpdoc-plugin-code-block-lowlight gpdoc-plugin-code-block
 
 Register `code_block_lowlight()` alongside `paragraph()`. It supplies the code-block node, commands, and a highlighter that uses the InspiredGitHub theme.
 
-## Inspect the colors for Rust source
+## Example
 
-In a [Quickstart project](/docs/quickstart/), register the highlighted code block and inspect the color tokens for Rust source.
+Register the highlighted code block with paragraphs. The highlighter reads the language stored on each code block. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node};
-use gpdoc_plugin_code_block::Language;
-use gpdoc_plugin_code_block_lowlight::code_block_lowlight;
+use gpdoc::EditorConfig;
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_code_block_lowlight::code_block_lowlight;
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(code_block_lowlight())
-    .build()?;
+    .build()
+    .expect("configure editor");
+```
+
+At the start of a paragraph, type `~~~rust` followed by a space. Enter Rust code to see the highlighted tokens.
+
+## Inspect the colors for Rust source
+
+With the configuration above, inspect the tokens for a Rust code block.
+
+```rust
+use gpdoc::{Editor, Node};
+use gpdoc_plugin_code_block::Language;
+
 let source = "fn main() {}";
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", source)])?;
 editor.run(gpdoc_plugin_code_block::Set(Language::Set("rust".into())))?;
@@ -99,6 +111,8 @@ editor.run(gpdoc_plugin_code_block::Toggle(Language::Keep))?;
 ## Render highlighted text
 
 Call `config.presentation().syntax_tokens(block, text)` with the exact source you draw. Each token’s `bytes` range indexes that UTF-8 source. Its `color` contains four sRGB and alpha bytes. The colors belong to the view, so the document continues to store plain source.
+
+To label the highlighted source, use `code_block_lowlight().with_view(code_view)` with the renderer from [Compose a code block](/docs/plugins/structure/code-block/#compose-a-code-block).
 
 ## Source code
 

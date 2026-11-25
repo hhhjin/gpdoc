@@ -19,7 +19,7 @@ Run this from a [Quickstart project](/docs/quickstart/).
 cargo add gpdoc-plugin-character-count
 ```
 
-## Count a status update
+## Example
 
 For a footer, read both counts from the current document after each edit. To enforce the same limit in the editor, register the configured plugin before you open the document.
 
@@ -35,7 +35,8 @@ use gpdoc_plugin_paragraph::paragraph;
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(character_count(CountOptions { limit: Some(140), ..Default::default() }))
-    .build()?;
+    .build()
+    .expect("configure editor");
 let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi! 😀")])?;
 assert_eq!(characters(editor.document(), CountMode::TextSize), 6);
 assert_eq!(words(editor.document()), 2);

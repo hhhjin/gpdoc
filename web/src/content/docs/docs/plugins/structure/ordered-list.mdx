@@ -19,19 +19,59 @@ cargo add gpdoc-plugin-ordered-list gpdoc-plugin-list-item
 
 ## Example
 
-In a [Quickstart project](/docs/quickstart/), register the list and its item type. Start numbering a list at 4.
+Register the numbered list and its item type. Use this configuration in the [Quickstart editor](/docs/quickstart/#configure-the-editor).
 
 ```rust
-use gpdoc::{Editor, EditorConfig, Node, Value};
-use gpdoc_plugin_list_item::list_item;
-use gpdoc_plugin_ordered_list::ordered_list;
+use gpdoc::{EditorConfig, PluginViewExt, ViewPlugin};
 use gpdoc_plugin_paragraph::paragraph;
+use gpdoc_plugin_list_item::list_item;
+use gpdoc_plugin_ordered_list::{ordered_list, ordered_list_body};
 
 let config = EditorConfig::builder()
     .plugin(paragraph())
     .plugin(list_item())
-    .plugin(ordered_list())
-    .build()?;
+    .plugin(ordered_list().with_view(numbered_view))
+    .build()
+    .expect("configure editor");
+
+fn numbered_view() -> ViewPlugin {
+    ordered_list_body(|block, _, _| block.content)
+}
+```
+
+Type `1.` followed by a space at the start of a paragraph. The editor creates a numbered item.
+
+## Compose a numbered list
+
+Wrap the whole list with `ordered_list_body`. The [list item view](/docs/plugins/structure/list-item/#compose-a-list-item) supplies each number from the starting counter and the item’s index.
+
+### Anatomy
+
+```text
+ordered_list_body(...)
+└── div()              Your wrapper
+    └── block.content  Editable items with their decimal markers
+```
+
+### Wrap the numbered items
+
+Replace `numbered_view` in the example above.
+
+```rust
+use gpui::{div, prelude::*};
+
+fn numbered_view() -> ViewPlugin {
+    ordered_list_body(|block, _, _| {
+        div().child(block.content)
+    })
+}
+```
+
+## Start numbering at four
+
+```rust
+use gpdoc::{Editor, Node, Value};
+
 let mut editor = Editor::from_document(&config, vec![Node::text("paragraph", "Publish the release")])?;
 editor.run(gpdoc_plugin_ordered_list::Toggle { start: Some(4), ..Default::default() })?;
 
@@ -75,28 +115,6 @@ editor.run(gpdoc_plugin_ordered_list::Wrap::default())?;
 | **Mod + Shift + 7** | `toggleOrderedList` |
 
 At the start of a paragraph, type a number, a period, and a space. After a list containing items 4 and 5, typing `6.` followed by a space continues that list. Typing `1.` followed by a space starts a separate list.
-
-## Compose a GPUI view
-
-An ordered list displays its editable items in document order by default. The list crate’s `gpui` feature also enables the automatic numbers, which start at the list’s `start` attribute. To customize the layout, attach a view using `gpdoc::PluginViewExt`.
-
-```rust
-.plugin(ordered_list().with_view(views::numbered))
-```
-
-In `views.rs`, place the editable content once. Register the list item renderer to display numbers from the ordered list’s starting counter.
-
-```rust
-use gpdoc::ViewPlugin;
-use gpdoc_plugin_ordered_list::ordered_list_body;
-use gpui::{div, prelude::*, px};
-
-pub fn numbered() -> ViewPlugin {
-    ordered_list_body(|block, _, _| {
-        div().pl(px(16.)).child(block.content)
-    })
-}
-```
 
 ## Source code
 
