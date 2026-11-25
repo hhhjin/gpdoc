@@ -20,7 +20,7 @@ gpdoc-plugin.workspace = true
 linkify = "0.10"
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }
 
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

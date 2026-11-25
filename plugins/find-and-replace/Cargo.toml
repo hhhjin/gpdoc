@@ -25,4 +25,4 @@ gpui = { workspace = true, optional = true }
 gpui-browser = { workspace = true, optional = true }
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }

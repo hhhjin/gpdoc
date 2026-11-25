@@ -15,4 +15,4 @@ gpdoc-plugin-code-block.workspace = true
 syntect = { version = "5.3", default-features = false, features = ["default-fancy"] }
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }

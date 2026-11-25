@@ -18,4 +18,4 @@ gpdoc = { workspace = true, features = ["gpui"], optional = true }
 gpdoc-plugin.workspace = true
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }

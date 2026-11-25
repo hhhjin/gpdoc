@@ -15,20 +15,20 @@ pulldown-cmark = { version = "0.13.6", default-features = false }
 pulldown-cmark-to-cmark = "22"
 
 [dev-dependencies]
-gpdoc-plugin-heading.workspace = true
-gpdoc-plugin-blockquote.workspace = true
-gpdoc-plugin-ordered-list.workspace = true
-gpdoc-plugin-list-item.workspace = true
-gpdoc-plugin-bold.workspace = true
-gpdoc-plugin-italic.workspace = true
-gpdoc-plugin-link.workspace = true
-gpdoc-plugin-inline-code.workspace = true
-gpdoc-plugin-code-block.workspace = true
-gpdoc-plugin-strike.workspace = true
-gpdoc-plugin-horizontal-rule.workspace = true
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-heading = { path = "../heading", default-features = false }
+gpdoc-plugin-blockquote = { path = "../blockquote", default-features = false }
+gpdoc-plugin-ordered-list = { path = "../ordered-list", default-features = false }
+gpdoc-plugin-list-item = { path = "../list-item", default-features = false }
+gpdoc-plugin-bold = { path = "../bold", default-features = false }
+gpdoc-plugin-italic = { path = "../italic", default-features = false }
+gpdoc-plugin-link = { path = "../link", default-features = false }
+gpdoc-plugin-inline-code = { path = "../inline-code", default-features = false }
+gpdoc-plugin-code-block = { path = "../code-block", default-features = false }
+gpdoc-plugin-strike = { path = "../strike", default-features = false }
+gpdoc-plugin-horizontal-rule = { path = "../horizontal-rule", default-features = false }
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }
 serde_json = "1"
-gpdoc-plugin-task-list.workspace = true
-gpdoc-plugin-table.workspace = true
-gpdoc-plugin-image.workspace = true
-gpdoc-plugin-mathematics.workspace = true
+gpdoc-plugin-task-list = { path = "../task-list", default-features = false }
+gpdoc-plugin-table = { path = "../table", default-features = false }
+gpdoc-plugin-image = { path = "../image", default-features = false }
+gpdoc-plugin-mathematics = { path = "../mathematics", default-features = false }
