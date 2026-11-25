@@ -14,4 +14,4 @@ gpdoc-plugin.workspace = true
 regex = "1"
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }

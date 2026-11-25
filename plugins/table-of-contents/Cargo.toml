@@ -14,5 +14,5 @@ gpdoc-plugin.workspace = true
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
-gpdoc-plugin-heading.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }
+gpdoc-plugin-heading = { path = "../heading", default-features = false }

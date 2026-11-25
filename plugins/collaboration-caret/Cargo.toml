@@ -23,7 +23,7 @@ default = ["gpui"]
 gpui = ["dep:gpdoc", "dep:gpui", "dep:gpui-browser", "gpdoc-plugin-collaboration/gpui"]
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui = { workspace = true, optional = true }

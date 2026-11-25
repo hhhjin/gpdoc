@@ -13,5 +13,5 @@ description = "Trailing Node plugin for the gpdoc editor"
 gpdoc-plugin.workspace = true
 
 [dev-dependencies]
-gpdoc-plugin-paragraph.workspace = true
-gpdoc-plugin-heading.workspace = true
+gpdoc-plugin-paragraph = { path = "../paragraph", default-features = false }
+gpdoc-plugin-heading = { path = "../heading", default-features = false }
