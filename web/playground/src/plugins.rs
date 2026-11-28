@@ -46,7 +46,7 @@ struct Presentation {
 #[derive(Serialize)]
 struct Token {
     text: String,
-    color: [u8; 4],
+    kind: gpdoc::SyntaxKind,
 }
 
 impl Preview {
@@ -74,7 +74,7 @@ impl Preview {
                         .filter_map(|token| {
                             Some(Token {
                                 text: text.get(token.bytes)?.into(),
-                                color: token.color,
+                                kind: token.kind,
                             })
                         })
                         .collect();

@@ -24,7 +24,6 @@ export const pluginGroups = [
     pages: [
       "structure/blockquote",
       "structure/code-block",
-      "structure/code-block-lowlight",
       "structure/details",
       "structure/hard-break",
       "structure/heading",

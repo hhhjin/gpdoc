@@ -73,7 +73,7 @@ impl InputBuffer {
 
     pub(crate) fn refresh_projection(&mut self, map: &PositionMap) -> Result<(), Error> {
         self.open_folds = mapped(&self.open_folds, map);
-        self.projection = Projection::new(
+        self.projection = self.projection.rebuild(
             self.editor.document(),
             self.editor.config(),
             &self.open_folds,
@@ -95,7 +95,7 @@ impl InputBuffer {
 
     pub(super) fn preview_projection(&self, input: &TextInputTransaction) -> Projection {
         let opened = mapped(&self.open_folds, input.position_map());
-        Projection::new(
+        self.projection.rebuild(
             input.document(),
             self.editor.config(),
             &opened,

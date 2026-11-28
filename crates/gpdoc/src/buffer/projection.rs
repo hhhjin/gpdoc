@@ -1,7 +1,11 @@
 use crate::{Fold, FoldSpec};
-use gpdoc_core::{ContentRef, DocPos, Document, EditorConfig, Error, Selection, TextFormat};
-use std::collections::BTreeSet;
+use gpdoc_core::{
+    ContentRef, DocPos, Document, EditorConfig, Error, Node, Presentation, Selection, SyntaxToken,
+    TextFormat,
+};
+use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
+use std::rc::Rc;
 
 #[derive(Clone)]
 struct Block {
@@ -23,39 +27,44 @@ pub(crate) struct FormatSpan {
     pub format: TextFormat,
 }
 
+struct HighlightedBlock {
+    // Keep the immutable node alive while its allocation address is a cache key.
+    node: Node,
+    runs: Vec<Vec<SyntaxToken>>,
+}
+
+impl HighlightedBlock {
+    fn key(&self) -> usize {
+        std::ptr::from_ref(&*self.node).addr()
+    }
+}
+
 /// AppKit addresses the text blocks as one string separated by newlines.
 /// Each side of a projected newline maps to an actual text cursor, even when
 /// the source blocks have different enclosing lists or quotes.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(in super::super) struct Projection {
     pub folds: Vec<Fold>,
     hidden_bodies: Vec<Range<DocPos>>,
     pub text: String,
     pub(super) object_bytes: Vec<Range<usize>>,
     blocks: Vec<Block>,
+    highlights: HashMap<usize, Rc<HighlightedBlock>>,
     pub(super) dividers: Vec<(DocPos, usize)>,
     pub formats: Vec<FormatSpan>,
     pub alignments: Vec<(usize, gpdoc_core::TextAlignment)>,
 }
 
 impl Projection {
-    pub fn new(
+    pub fn rebuild(
+        &self,
         doc: &Document,
         config: &EditorConfig,
         open_folds: &BTreeSet<DocPos>,
         specs: &std::collections::BTreeMap<String, FoldSpec>,
     ) -> Self {
         let presentation = config.presentation();
-        let mut projection = Self {
-            folds: Vec::new(),
-            hidden_bodies: Vec::new(),
-            text: String::new(),
-            object_bytes: Vec::new(),
-            blocks: Vec::new(),
-            dividers: Vec::new(),
-            formats: Vec::new(),
-            alignments: Vec::new(),
-        };
+        let mut projection = Self::default();
         let mut ancestors: Vec<(usize, TextFormat)> = Vec::new();
         for (before, node) in doc.iter_blocks() {
             if projection.hidden(before) {
@@ -137,7 +146,11 @@ impl Projection {
                     );
                 }
             }
-            for run in runs {
+            let highlights = self.highlights_for(doc, presentation, node, runs);
+            if let Some(block) = &highlights {
+                projection.highlights.insert(block.key(), Rc::clone(block));
+            }
+            for (index, run) in runs.iter().enumerate() {
                 let mut run_format = format.clone();
                 let text = doc.inline_text(run);
                 for mark in run.marks() {
@@ -156,10 +169,13 @@ impl Projection {
                 }
                 at += run.size();
                 let mut offset = 0;
-                for token in presentation.syntax_tokens(node, text) {
+                let tokens = highlights
+                    .as_ref()
+                    .map_or(&[][..], |block| block.runs[index].as_slice());
+                for token in tokens {
                     projection.push_text(&text[offset..token.bytes.start], run_format.clone());
                     let mut colored = run_format.clone();
-                    colored.color = Some(token.color);
+                    colored.syntax_kind = Some(token.kind);
                     projection.push_text(&text[token.bytes.clone()], colored);
                     offset = token.bytes.end;
                 }
@@ -176,6 +192,36 @@ impl Projection {
             });
         }
         projection
+    }
+
+    fn highlights_for(
+        &self,
+        doc: &Document,
+        presentation: &Presentation,
+        node: &Node,
+        runs: &[Node],
+    ) -> Option<Rc<HighlightedBlock>> {
+        if !presentation.highlighters.contains_key(node.kind()) {
+            return None;
+        }
+        if let Some(block) = self.highlights.get(&std::ptr::from_ref(&**node).addr()) {
+            return Some(Rc::clone(block));
+        }
+        let runs = runs
+            .iter()
+            .map(|run| {
+                let text = doc.inline_text(run);
+                if run.is_text() || text == "\n" {
+                    presentation.syntax_tokens(node, text)
+                } else {
+                    Vec::new()
+                }
+            })
+            .collect();
+        Some(Rc::new(HighlightedBlock {
+            node: node.clone(),
+            runs,
+        }))
     }
 
     pub fn hidden(&self, at: DocPos) -> bool {

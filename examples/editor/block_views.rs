@@ -100,6 +100,9 @@ pub fn code() -> ViewPlugin {
             .font_family(MONOSPACE)
             .child(block.content)
     })
+    .node_format("codeBlock", |_, style| {
+        style.syntax_palette = Some(gpdoc::SyntaxPalette::Light)
+    })
 }
 
 pub fn list_item() -> ViewPlugin {

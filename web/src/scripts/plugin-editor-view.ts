@@ -6,7 +6,6 @@ type Point = { node: Node; offset: number };
 type Segment = { node: Text; from: number; to: number; marks: Mark[] };
 type Boundary = { point: Point; pos: number };
 type SearchResults = { ranges: Position[]; current: number | null };
-type Color = [number, number, number, number];
 
 export type Decorations = {
   presentation?: Attributes;
@@ -31,11 +30,6 @@ export function isSearchResults(value: unknown): value is SearchResults {
   if (!isObject(value) || !Array.isArray(value.ranges) || !value.ranges.every(isPosition)) return false;
   const { current } = value;
   return current === null || (typeof current === "number" && Number.isInteger(current) && current >= 0 && current < value.ranges.length);
-}
-
-function color(value: unknown): value is Color {
-  return Array.isArray(value) && value.length === 4 &&
-    value.every((n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 255);
 }
 
 function mark(value: unknown): Mark {
@@ -239,8 +233,11 @@ export class EditorView {
     let html: Node;
     if (tag) html = wrap(element(tag));
     else switch (type) {
-      case "text":
-        return this.text(node.text, from, node.marks);
+      case "text": {
+        const span = this.text(node.text, from, node.marks);
+        if (typeof attrs.syntax === "string") span.dataset.syntax = attrs.syntax;
+        return span;
+      }
       case "paragraph":
       case "heading":
       case "detailsSummary": {
@@ -307,21 +304,11 @@ export class EditorView {
         const code = element("code");
         const pre = element("pre", code);
         const tokens = items(view.tokens).flatMap((token): DocNode[] =>
-          isObject(token) && typeof token.text === "string" && color(token.color)
-            ? [{ type: "text", attrs: { color: token.color }, text: token.text, marks: [], content: [] }]
+          isObject(token) && typeof token.text === "string" && typeof token.kind === "string"
+            ? [{ type: "text", attrs: { syntax: token.kind }, text: token.text, marks: [], content: [] }]
             : []);
         // Token text has the same document offsets as the source text it colors.
         this.cursor(code, tokens.length ? tokens : content, from + 1);
-        if (tokens.length) {
-          pre.dataset.syntax = "";
-          code.childNodes.forEach((segment, index) => {
-            const rgba = tokens[index]?.attrs.color;
-            if (segment instanceof HTMLElement && color(rgba)) {
-              const [r, g, b, a] = rgba;
-              segment.style.color = `rgba(${r}, ${g}, ${b}, ${a / 255})`;
-            }
-          });
-        }
         html = pre;
         break;
       }

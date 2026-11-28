@@ -38,7 +38,7 @@ impl InputBuffer {
         fold_specs: std::rc::Rc<crate::fold::FoldSpecs>,
     ) -> Result<Self, Error> {
         let mut buffer = Self {
-            projection: Projection::new(
+            projection: Projection::default().rebuild(
                 editor.document(),
                 editor.config(),
                 &Default::default(),
@@ -420,7 +420,7 @@ impl InputBuffer {
 
     pub(super) fn cancel_mark(&mut self) {
         if self.composition.take().is_some() {
-            self.projection = Projection::new(
+            self.projection = self.projection.rebuild(
                 self.editor.document(),
                 self.editor.config(),
                 &self.open_folds,

@@ -777,7 +777,8 @@ impl EditorView {
                 let _ = view.update(cx, |view, cx| view.plugin_key(&event.keystroke, window, cx));
             }
         });
-        self.input_context_listeners = vec![blur, activation, input_source, shortcuts];
+        let appearance = cx.observe_window_appearance(window, |_, _, cx| cx.notify());
+        self.input_context_listeners = vec![blur, activation, input_source, shortcuts, appearance];
     }
 
     fn mouse_up(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {

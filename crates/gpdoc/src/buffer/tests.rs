@@ -36,6 +36,51 @@ fn buffer(nodes: Vec<Node>) -> InputBuffer {
 }
 
 #[test]
+fn edits_reuse_highlighting_for_unchanged_blocks() {
+    use gpdoc_core::SyntaxToken;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    let config = fixture(|spec| {
+        spec.node(NodeSpec::block("codeBlock").group("block").content("text*"));
+        spec.syntax_highlighter("codeBlock", move |_, text| {
+            counter.fetch_add(1, Ordering::Relaxed);
+            vec![SyntaxToken {
+                bytes: 0..text.len(),
+                kind: gpdoc_core::SyntaxKind::String,
+            }]
+        });
+    })
+    .build()
+    .unwrap();
+    let source = "fn example() {}\n".repeat(1000);
+    let nodes = vec![
+        p("a"),
+        Node::text("codeBlock", &source),
+        Node::text("codeBlock", "x"),
+    ];
+    let mut buffer = InputBuffer::open(Editor::from_document(&config, nodes).unwrap()).unwrap();
+    assert_eq!(calls.load(Ordering::Relaxed), 2);
+
+    buffer.replace(Some(0..1), "before").unwrap();
+    buffer.mark(Some(0..0), "m", None).unwrap();
+    buffer.cancel_mark();
+    assert_eq!(calls.load(Ordering::Relaxed), 2);
+
+    let end = buffer.text().len();
+    buffer.replace(Some(end..end), "y").unwrap();
+    assert_eq!(calls.load(Ordering::Relaxed), 3);
+    assert_eq!(
+        buffer.formats().last().unwrap().format.syntax_kind,
+        Some(gpdoc_core::SyntaxKind::String)
+    );
+}
+
+#[test]
 fn nested_node_and_mark_formats_follow_multibyte_text_and_preedit() {
     use gpdoc_core::{Attrs, Content, Mark, MarkSpec, TextFormat, TextRun};
 

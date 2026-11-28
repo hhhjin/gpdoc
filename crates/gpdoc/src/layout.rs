@@ -5,7 +5,7 @@ pub use content::{ChildWrapper, EditableChild};
 mod images;
 mod styled;
 use super::{buffer::FormatSpan, view::EditorView};
-use gpdoc_core::TextAlignment;
+use gpdoc_core::{SyntaxKind, SyntaxPalette, TextAlignment};
 use gpui::{
     App, AvailableSpace, Bounds, ElementId, ElementInputHandler, Entity, GlobalElementId,
     InspectorElementId, LayoutId, Pixels, Point, Size, Style, TextStyle, Window, WrappedLine, fill,
@@ -347,10 +347,28 @@ fn visual_rows(lines: &[PaintLine], mut offset: usize) -> Vec<Row> {
 
 #[derive(Clone)]
 struct Typography {
+    syntax_palette: SyntaxPalette,
     images: Rc<images::Images>,
     style: TextStyle,
     font_size: Pixels,
     line_height: Pixels,
+}
+
+fn syntax_color(kind: SyntaxKind, palette: SyntaxPalette) -> gpui::Hsla {
+    let (light, dark) = match kind {
+        SyntaxKind::Plain => (0x24292f, 0xe6edf3),
+        SyntaxKind::Comment => (0x57606a, 0x9198a1),
+        SyntaxKind::Keyword => (0xcf222e, 0xff7b72),
+        SyntaxKind::String => (0x0a3069, 0xa5d6ff),
+        SyntaxKind::Constant => (0x0550ae, 0x79c0ff),
+        SyntaxKind::Function => (0x8250df, 0xd2a8ff),
+        SyntaxKind::Type => (0x953800, 0xffa657),
+    };
+    rgb(match palette {
+        SyntaxPalette::Light => light,
+        SyntaxPalette::Dark => dark,
+    })
+    .into()
 }
 
 fn font_family(name: &str) -> &str {
@@ -390,7 +408,10 @@ impl Typography {
             let end = span.byte_end.min(bytes.end);
             let mut run = self.style.to_run(end - start);
             let format = &span.format;
-            if let Some(color) = format.color {
+            if let Some(kind) = format.syntax_kind {
+                run.color =
+                    syntax_color(kind, format.syntax_palette.unwrap_or(self.syntax_palette));
+            } else if let Some(color) = format.color {
                 run.color = rgba(u32::from_be_bytes(color)).into();
             }
             if let Some(family) = &format.font_family {
@@ -891,10 +912,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn syntax_runs_follow_window_palette_or_fixed_background() {
+        let mut typography = Typography {
+            images: Default::default(),
+            style: TextStyle::default(),
+            font_size: px(16.),
+            line_height: px(24.),
+            syntax_palette: SyntaxPalette::Light,
+        };
+        let mut span = FormatSpan {
+            byte_end: 2,
+            utf16_end: 2,
+            format: gpdoc_core::TextFormat {
+                syntax_kind: Some(SyntaxKind::Keyword),
+                ..Default::default()
+            },
+        };
+        let color = |typography: &Typography, span: &FormatSpan| {
+            typography.runs(std::slice::from_ref(span), 0..2)[0].color
+        };
+        let light = color(&typography, &span);
+        typography.syntax_palette = SyntaxPalette::Dark;
+        let dark = color(&typography, &span);
+        assert_ne!(light, dark);
+        span.format.syntax_palette = Some(SyntaxPalette::Light);
+        assert_eq!(color(&typography, &span), light);
+        span.format.syntax_palette = Some(SyntaxPalette::Dark);
+        typography.syntax_palette = SyntaxPalette::Light;
+        assert_eq!(color(&typography, &span), dark);
+    }
+
+    #[test]
     fn media_activation_resolves_urls_inside_the_painted_atom() {
         let layout = TextSection {
             bounds: Bounds::new(point(px(0.), px(0.)), size(px(80.), px(24.))),
             typography: Typography {
+                syntax_palette: SyntaxPalette::Light,
                 images: Default::default(),
                 style: TextStyle::default(),
                 font_size: px(16.),
@@ -1034,6 +1087,7 @@ mod tests {
         let layout = TextSection {
             bounds: Bounds::default(),
             typography: Typography {
+                syntax_palette: SyntaxPalette::Light,
                 images: Default::default(),
                 style: TextStyle::default(),
                 font_size: px(16.),
@@ -1097,6 +1151,7 @@ mod tests {
                     size(px(80.), height * widths.len() as f32),
                 ),
                 typography: Typography {
+                    syntax_palette: SyntaxPalette::Light,
                     images: Default::default(),
                     style: TextStyle::default(),
                     font_size: px(16.),
@@ -1153,6 +1208,7 @@ mod tests {
         let layout = TextSection {
             bounds: Bounds::new(point(px(24.), px(-8.)), size(px(36.), px(96.))),
             typography: Typography {
+                syntax_palette: SyntaxPalette::Light,
                 images: Default::default(),
                 style: TextStyle::default(),
                 font_size: px(15.),

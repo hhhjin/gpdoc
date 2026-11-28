@@ -66,6 +66,9 @@ pub struct TextFormat {
     pub italic: bool,
     pub background: Option<[u8; 4]>,
     pub color: Option<[u8; 4]>,
+    pub syntax_kind: Option<SyntaxKind>,
+    /// Fixed background palette for this text. The view chooses when unset.
+    pub syntax_palette: Option<SyntaxPalette>,
     pub font_family: Option<std::sync::Arc<str>>,
     pub font_fallbacks: Option<std::sync::Arc<Vec<String>>>,
     pub alignment: TextAlignment,
@@ -73,11 +76,30 @@ pub struct TextFormat {
     pub line_height: Option<TextLength>,
 }
 
-/// A syntax token in a UTF-8 text run. The color uses sRGB and alpha bytes.
+/// A theme-independent classification of source text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SyntaxKind {
+    Plain,
+    Comment,
+    Keyword,
+    String,
+    Constant,
+    Function,
+    Type,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyntaxPalette {
+    Light,
+    Dark,
+}
+
+/// A syntax token in a UTF-8 text run.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SyntaxToken {
     pub bytes: std::ops::Range<usize>,
-    pub color: [u8; 4],
+    pub kind: SyntaxKind,
 }
 
 pub type Highlighter = std::sync::Arc<dyn Fn(&Attrs, &str) -> Vec<SyntaxToken> + Send + Sync>;

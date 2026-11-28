@@ -10,10 +10,15 @@ readme.workspace = true
 description = "Code block plugin for the gpdoc rich-text editor"
 
 [features]
-default = ["gpui"]
+default = ["gpui", "syntect"]
+syntect = ["dep:syntect"]
 gpui = ["dep:gpdoc"]
 
 [dependencies]
 gpdoc = { workspace = true, features = ["gpui"], optional = true }
 regex = "1"
 gpdoc-plugin.workspace = true
+syntect = { version = "5.3", optional = true, default-features = false, features = ["default-syntaxes", "regex-fancy"] }
+
+[dev-dependencies]
+gpdoc-plugin-paragraph = { workspace = true }

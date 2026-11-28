@@ -4,7 +4,7 @@ import { common, createLowlight } from 'lowlight'
 
 export const plugins = [
   [Details, 'Details'], [DetailsSummary, 'DetailsSummary'], [DetailsContent, 'DetailsContent'],
-  [CodeBlockLowlight.configure({ lowlight: createLowlight(common) }), 'CodeBlockLowlight', 'codeBlockLowlight'],
+  [CodeBlockLowlight.configure({ lowlight: createLowlight(common) }), 'CodeBlock', 'codeBlockLowlight'],
 ]
 
 const p = (...content) => ({type:'paragraph',content})

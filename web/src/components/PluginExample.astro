@@ -262,10 +262,12 @@ const collaboration = plugin.startsWith("collaboration");
     white-space: pre;
   }
 
-  .example-document :global(pre[data-syntax]) {
-    background: #f7f7f7;
-    color: #24292f;
-  }
+  .example-document :global([data-syntax="keyword"]) { color: var(--sl-color-red-high); }
+  .example-document :global([data-syntax="string"]) { color: var(--sl-color-green-high); }
+  .example-document :global([data-syntax="constant"]) { color: var(--sl-color-blue-high); }
+  .example-document :global([data-syntax="function"]) { color: var(--sl-color-purple-high); }
+  .example-document :global([data-syntax="type"]) { color: var(--sl-color-orange-high); }
+  .example-document :global([data-syntax="comment"]) { color: var(--sl-color-gray-3); }
 
   .example-document :global(table) {
     width: 100%;

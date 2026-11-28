@@ -96,6 +96,28 @@ Pass `Language::Set(name)` to select a language, `Language::Keep` to preserve th
 editor.run(gpdoc_plugin_code_block::Set(Language::Clear))?;
 ```
 
+### Syntax highlighting
+
+`code_block()` colors recognized languages using the bundled syntect definitions. If the language is missing or unknown, the highlighter checks the first line for a hint such as a shebang. Colors apply only when rendering. Both Tiptap CodeBlock and CodeBlockLowlight documents use the same `codeBlock` node.
+
+GPUI follows the window’s light or dark appearance. For a code block with a fixed background, select the matching palette on its view. This example uses a light palette on an off-white background.
+
+```rust
+use gpdoc::SyntaxPalette;
+use gpui::{div, prelude::*};
+
+fn code_view() -> ViewPlugin {
+    code_block_body(|block, _, _| {
+        div().bg(gpui::rgb(0xf9f8f6)).child(block.content)
+    })
+    .node_format("codeBlock", |_, style| {
+        style.syntax_palette = Some(SyntaxPalette::Light);
+    })
+}
+```
+
+The default Cargo features enable both `gpui` and `syntect`. The `gpui` feature provides `code_block_body()` for composing the editable block in a GPUI view. The `syntect` feature colors the source. To use the GPUI view helper with plain code text, set `default-features = false` and `features = ["gpui"]` on the crate dependency.
+
 ## Commands
 
 ### `setCodeBlock`
@@ -122,7 +144,7 @@ editor.run(gpdoc_plugin_code_block::Toggle(Language::Keep))?;
 
 ## Start a code block while typing
 
-Start a paragraph with three backticks or three tildes and press Space. To choose a language, type a lowercase name after the fence, as in `~~~rust`, then press Space. The input rule consumes the fence. To color the source, see [Code block with syntax highlighting](/docs/plugins/structure/code-block-lowlight/).
+Start a paragraph with three backticks or three tildes and press Space. To choose a language, type a lowercase name after the fence, as in `~~~rust`, then press Space. The input rule consumes the fence.
 
 ## Source code
 

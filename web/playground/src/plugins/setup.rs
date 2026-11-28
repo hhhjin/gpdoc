@@ -74,9 +74,6 @@ pub(super) fn open(slug: &str, source: &str) -> Result<Editor> {
         "hard-break" => vec![gpdoc_plugin_hard_break::hard_break().into()],
         "horizontal-rule" => vec![gpdoc_plugin_horizontal_rule::horizontal_rule().into()],
         "code-block" => vec![gpdoc_plugin_code_block::code_block().into()],
-        "code-block-lowlight" => {
-            vec![gpdoc_plugin_code_block_lowlight::code_block_lowlight().into()]
-        }
         "details" => vec![gpdoc_plugin_details::details()],
         "table" => vec![gpdoc_plugin_table::table().into()],
         "image" => vec![gpdoc_plugin_image::image().into()],

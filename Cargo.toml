@@ -33,7 +33,6 @@ gpdoc-plugin-bubble-menu = { path = "plugins/bubble-menu", version = "0.2.0" }
 gpdoc-plugin-bullet-list = { path = "plugins/bullet-list", version = "0.2.0", default-features = false }
 gpdoc-plugin-character-count = { path = "plugins/character-count", version = "0.2.0" }
 gpdoc-plugin-code-block = { path = "plugins/code-block", version = "0.2.0", default-features = false }
-gpdoc-plugin-code-block-lowlight = { path = "plugins/code-block-lowlight", version = "0.2.0" }
 gpdoc-plugin-collaboration = { path = "plugins/collaboration", version = "0.2.0", default-features = false }
 gpdoc-plugin-collaboration-caret = { path = "plugins/collaboration-caret", version = "0.2.0", default-features = false }
 gpdoc-plugin-details = { path = "plugins/details", version = "0.2.0", default-features = false }

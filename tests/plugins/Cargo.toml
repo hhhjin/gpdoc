@@ -14,8 +14,7 @@ gpdoc-plugin-blockquote.workspace = true
 gpdoc-plugin-bold.workspace = true
 gpdoc-plugin-bullet-list.workspace = true
 gpdoc-plugin-character-count.workspace = true
-gpdoc-plugin-code-block-lowlight.workspace = true
-gpdoc-plugin-code-block.workspace = true
+gpdoc-plugin-code-block = { workspace = true, features = ["syntect"] }
 gpdoc-plugin-details.workspace = true
 gpdoc-plugin-find-and-replace.workspace = true
 gpdoc-plugin-hard-break.workspace = true

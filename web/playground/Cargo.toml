@@ -59,7 +59,6 @@ gpdoc-plugin-underline = { workspace = true, default-features = true }
 gpdoc-plugin-table = { workspace = true, default-features = true }
 gpdoc-plugin-task-list = { workspace = true, default-features = true }
 gpdoc-plugin-character-count.workspace = true
-gpdoc-plugin-code-block-lowlight.workspace = true
 gpdoc-plugin-collaboration = { workspace = true, default-features = true }
 gpdoc-plugin-collaboration-caret = { workspace = true, default-features = true }
 gpdoc-plugin-find-and-replace = { workspace = true, default-features = true }

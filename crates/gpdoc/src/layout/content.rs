@@ -210,6 +210,14 @@ impl Element for TextFragment {
             span: self.span.clone(),
             source: self.source.clone(),
             typography: Typography {
+                syntax_palette: match window.appearance() {
+                    gpui::WindowAppearance::Light | gpui::WindowAppearance::VibrantLight => {
+                        SyntaxPalette::Light
+                    }
+                    gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark => {
+                        SyntaxPalette::Dark
+                    }
+                },
                 images: self.images.clone(),
                 font_size: text_style.font_size.to_pixels(window.rem_size()),
                 style: text_style,

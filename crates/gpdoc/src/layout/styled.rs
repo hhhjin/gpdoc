@@ -491,6 +491,7 @@ mod tests {
         let window = app.add_empty_window();
         window.update(|window, _| {
             let typography = Typography {
+                syntax_palette: SyntaxPalette::Light,
                 style: TextStyle::default(),
                 font_size: px(18.),
                 line_height: px(26.),
@@ -544,6 +545,7 @@ mod tests {
         let window = app.add_empty_window();
         window.update(|window, _| {
             let typography = Typography {
+                syntax_palette: SyntaxPalette::Light,
                 style: TextStyle::default(),
                 font_size: px(20.),
                 line_height: px(30.),
