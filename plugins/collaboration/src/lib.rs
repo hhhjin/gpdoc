@@ -1,4 +1,4 @@
-//! A headless editor bound to a Yrs XML fragment compatible with Tiptap.
+//! A headless editor bound to a Yjs XML fragment compatible with Tiptap.
 //! Seed once with [Collaboration::new]. Other peers join using [Collaboration::from_update].
 //! Send V1 updates through the application's transport and use [Collaboration::undo] for local history.
 #[cfg(feature = "gpui")]
@@ -9,14 +9,16 @@ pub use view::CollaborationView;
 mod position;
 mod tree;
 pub use position::RelativeSelection;
-pub use yrs::{StateVector, updates::decoder::Decode, updates::encoder::Encode};
+pub use y_octo::StateVector;
 
 use gpdoc_plugin::EditorConfig;
 use gpdoc_plugin::prelude::{Editor, Error as EditorError, Selection};
+use once_cell::sync::OnceCell;
 use position::Positions;
-use std::sync::Arc;
-use web_time::{SystemTime, UNIX_EPOCH};
-use yrs::{Doc, OffsetKind, Options, ReadTxn, Transact, UndoManager, Update, XmlFragmentRef};
+use y_octo::{
+    Doc, DocOptions, DocSession, LocalUpdate, SessionConfig, SessionTxOrigin, SessionUndoConfig,
+    TypeIdentity, TypeTarget, UndoManager, UndoOptions, Update, XMLFragment, YTypeKind,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -26,48 +28,43 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error("unsupported collaborative content: {0}")]
     Content(String),
-    #[error("invalid Yjs update: {0}")]
-    Update(String),
-}
-
-fn document() -> Doc {
-    Doc::with_options(Options {
-        offset_kind: OffsetKind::Utf16,
-        ..Default::default()
-    })
-}
-
-fn timestamp_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64
-}
-
-fn apply(doc: &Doc, update: &[u8]) -> Result<(), Error> {
-    let update = Update::decode_v1(update).map_err(|e| Error::Update(e.to_string()))?;
-    doc.transact_mut_with("remote")
-        .apply_update(update)
-        .map_err(|e| Error::Update(e.to_string()))
+    #[error(transparent)]
+    Crdt(#[from] y_octo::JwstCodecError),
 }
 
 pub struct Collaboration {
     doc: Doc,
+    root: XMLFragment,
     field: String,
-    root: XmlFragmentRef,
     history: UndoManager,
+    // This replica authors a single edit at a time. A failed edit can discard
+    // it without changing the committed document or its undo/redo stacks.
+    writer: OnceCell<DocSession>,
     editor: Editor,
+}
+
+fn writer_config() -> SessionConfig {
+    SessionConfig {
+        undo: SessionUndoConfig::Disabled,
+    }
 }
 
 impl Collaboration {
     /// Tiptap uses the field name `default` unless the host configures a different fragment.
     pub fn new(editor: Editor, field: impl Into<String>) -> Result<Self, Error> {
         let field = field.into();
-        let doc = document();
-        let root = doc.get_or_insert_xml_fragment(field.as_str());
-        let seed = tree::encode(editor.document().blocks())?;
-        tree::seed(&mut doc.transact_mut(), &root, &seed);
-        Ok(Self::bind(doc, root, field, editor))
+        let mut writer = DocSession::with_config(DocOptions::default(), writer_config());
+        let target = writer.ensure_root(&field, YTypeKind::XMLFragment)?.into();
+        tree::seed(
+            &mut writer,
+            &target,
+            &tree::encode(editor.document().blocks(), 0)?,
+        )?;
+        let mut doc = Doc::new();
+        doc.apply_update(Update::decode_v1(writer.encode_update_v1()?)?)?;
+        let mut session = Self::bind(doc, field, editor)?;
+        session.writer = OnceCell::with_value(writer);
+        Ok(session)
     }
 
     pub fn from_update(
@@ -76,32 +73,58 @@ impl Collaboration {
         update: &[u8],
     ) -> Result<Self, Error> {
         let field = field.into();
-        let doc = document();
-        let root = doc.get_or_insert_xml_fragment(field.as_str());
-        apply(&doc, update)?;
-        let blocks = tree::decode(config.schema(), tree::read(&doc.transact(), &root, 0)?)?;
-        let mut editor = gpdoc_plugin::core::Editor::from_document(config, blocks.clone())?;
+        let mut doc = Doc::new();
+        let root = doc.get_or_create_xml_fragment(&field)?;
+        doc.apply_update(Update::decode_v1(update)?)?;
+        let blocks = tree::decode(config.schema(), tree::read(&doc, &root)?)?;
+        let mut editor = Editor::from_document(config, blocks.clone())?;
         editor.load_snapshot(blocks)?;
-        Ok(Self::bind(doc, root, field, editor))
+        Self::bind(doc, field, editor)
     }
 
-    fn bind(doc: Doc, root: XmlFragmentRef, field: String, editor: Editor) -> Self {
-        let mut history = UndoManager::with_options(yrs::undo::Options {
-            capture_timeout_millis: 500,
-            tracked_origins: Default::default(),
-            capture_transaction: None,
-            timestamp: Arc::new(timestamp_millis),
-            init_undo_stack: Vec::new(),
-            init_redo_stack: Vec::new(),
-        });
-        history.expand_scope(&doc, &root);
-        history.include_origin("gpdoc");
-        Self {
+    fn bind(doc: Doc, field: String, editor: Editor) -> Result<Self, Error> {
+        let root = doc.get_or_create_xml_fragment(&field)?;
+        let history = UndoManager::new(
+            &doc,
+            [(&root).into()],
+            UndoOptions {
+                capture_timeout: 0,
+                ..Default::default()
+            },
+        )?;
+        Ok(Self {
             doc,
             root,
             field,
             history,
+            writer: OnceCell::new(),
             editor,
+        })
+    }
+
+    fn target(&self) -> TypeTarget {
+        TypeIdentity::Root(self.field.clone()).into()
+    }
+
+    fn fresh_writer(&self) -> Result<DocSession, Error> {
+        let mut writer = DocSession::from_update_v1(
+            &self.doc.encode_update_v1()?,
+            DocOptions::default(),
+            writer_config(),
+        )?;
+        writer.ensure_root(&self.field, YTypeKind::XMLFragment)?;
+        Ok(writer)
+    }
+
+    fn writer(&self) -> Result<&DocSession, Error> {
+        self.writer.get_or_try_init(|| self.fresh_writer())
+    }
+
+    fn sync_writer(&mut self, update: &[u8]) {
+        if let Some(writer) = self.writer.get_mut()
+            && writer.apply_update_v1(update).is_err()
+        {
+            self.writer.take();
         }
     }
 
@@ -110,9 +133,8 @@ impl Collaboration {
     }
 
     /// Construct ephemeral Yjs awareness state using this peer's document identity.
-    pub fn awareness(&self) -> yrs::sync::Awareness {
-        let doc = Doc::with_options(Options::with_client_id(self.doc.client_id()));
-        yrs::sync::Awareness::with_clock(doc, timestamp_millis)
+    pub fn awareness(&self) -> y_octo::Awareness {
+        y_octo::Awareness::new(self.doc.client())
     }
 
     /// Apply an editor action atomically and return only the update produced by this action.
@@ -122,9 +144,7 @@ impl Collaboration {
     ) -> Result<(R, Vec<u8>), Error> {
         let mut editor = self.editor.fork();
         let result = edit(&mut editor)?;
-        let update = self
-            .record(&editor)?
-            .unwrap_or_else(|| Update::EMPTY_V1.to_vec());
+        let update = self.record(&editor)?.unwrap_or_else(|| vec![0, 0]);
         Ok((result, update))
     }
 
@@ -141,13 +161,35 @@ impl Collaboration {
         {
             None
         } else {
-            let new = tree::encode(editor.document().blocks())?;
-            let mut tx = self.doc.transact_mut_with("gpdoc");
-            let old = tree::read(&tx, &self.root, 0)?;
-            tree::reconcile(&mut tx, &self.root, &old, &new, editor.schema(), &map);
-            Some(tx.encode_update_v1())
+            let new = tree::encode(editor.document().blocks(), 0)?;
+            let old = tree::read(&self.doc, &self.root)?;
+            let mut writer = match self.writer.take() {
+                Some(writer) => writer,
+                None => self.fresh_writer()?,
+            };
+            writer.begin_tx(SessionTxOrigin::Untracked)?;
+            tree::reconcile(
+                &mut writer,
+                &self.target(),
+                &old,
+                &new,
+                editor.schema(),
+                &map,
+            )?;
+            let update = writer.commit_tx()?.map(|commit| commit.update);
+            if let Some(bytes) = &update {
+                let applied = self
+                    .doc
+                    .apply_local_update(Update::decode_v1(bytes)?, None)?;
+                if let LocalUpdate::MissingDependencies(_) = applied {
+                    return Err(Error::Content(
+                        "local edit depends on missing document updates".into(),
+                    ));
+                }
+            }
+            self.writer = OnceCell::with_value(writer);
+            update
         };
-        self.history.reset();
         self.editor = editor.fork();
         Ok(update)
     }
@@ -157,9 +199,9 @@ impl Collaboration {
     }
 
     pub fn relative_selection(&self) -> Option<RelativeSelection> {
-        let tx = self.doc.transact();
-        Positions::new(&tx, self.root.clone(), self.editor.schema()).relative(
-            &tx,
+        let writer = self.writer().ok()?;
+        Positions::new(writer, &self.target(), self.editor.schema())?.relative(
+            writer,
             self.editor.selection(),
             self.editor.document(),
             self.editor.config(),
@@ -175,40 +217,34 @@ impl Collaboration {
         relative: &RelativeSelection,
         editor: &Editor,
     ) -> Option<Selection> {
-        let tx = self.doc.transact();
-        let selection = Positions::new(&tx, self.root.clone(), editor.schema()).absolute(
-            &tx,
-            relative,
-            editor.config(),
-        )?;
+        let selection = Positions::new(self.writer().ok()?, &self.target(), editor.schema())?
+            .absolute(&self.doc, relative, editor.config())?;
         selection.validate(editor.document()).ok()?;
         Some(selection)
     }
 
     pub fn state_vector(&self) -> StateVector {
-        self.doc.transact().state_vector()
+        self.doc.get_state_vector()
     }
 
     /// Pass the receiver's state vector, or an empty vector to export the whole document.
-    pub fn update_since(&self, vector: &StateVector) -> Vec<u8> {
-        self.doc.transact().encode_state_as_update_v1(vector)
+    pub fn update_since(&self, vector: &StateVector) -> Result<Vec<u8>, Error> {
+        Ok(self.doc.encode_state_as_update_v1(vector)?)
     }
 
     pub fn apply_update(&mut self, update: &[u8]) -> Result<(), Error> {
         // A merge can yield schema-invalid content even when both starting editors were valid.
         // Validate on a replica before committing the update to the live CRDT and undo history.
-        let check = document();
-        let root = check.get_or_insert_xml_fragment(self.field.as_str());
-        apply(&check, &self.update_since(&StateVector::default()))?;
-        apply(&check, update)?;
-        let blocks = tree::decode(
-            self.editor.schema(),
-            tree::read(&check.transact(), &root, 0)?,
-        )?;
+        let update_data = Update::decode_v1(update)?;
+        let mut check = Doc::try_from_binary_v1(self.doc.encode_update_v1()?)?;
+        let root = check.get_or_create_xml_fragment(&self.field)?;
+        check.apply_update(update_data.clone())?;
+        let blocks = tree::decode(self.editor.schema(), tree::read(&check, &root)?)?;
         let mut next = self.editor.fork();
         next.load_snapshot(blocks)?;
         let pin = self.relative_selection();
-        apply(&self.doc, update)?;
+        self.doc.apply_update(update_data)?;
+        self.sync_writer(update);
         if next.document() != self.editor.document() {
             if let Some(selection) = pin.and_then(|p| self.resolve_selection_in(&p, &next)) {
                 let _ = next.select(selection);
@@ -226,21 +262,16 @@ impl Collaboration {
     }
 
     fn history_step(&mut self, redo: bool) -> Result<Vec<u8>, Error> {
-        let vector = self.state_vector();
         let pin = self.relative_selection();
-        let changed = if redo {
-            self.history.redo_blocking()
+        let vector = self.state_vector();
+        if redo {
+            self.history.redo()?
         } else {
-            self.history.undo_blocking()
-        };
-        if !changed {
-            return Err(EditorError::NoHistory.into());
+            self.history.undo()?
         }
+        .ok_or(EditorError::NoHistory)?;
         let next = (|| {
-            let blocks = tree::decode(
-                self.editor.schema(),
-                tree::read(&self.doc.transact(), &self.root, 0)?,
-            )?;
+            let blocks = tree::decode(self.editor.schema(), tree::read(&self.doc, &self.root)?)?;
             let mut next = self.editor.fork();
             next.load_snapshot(blocks)?;
             Ok::<_, Error>(next)
@@ -249,17 +280,20 @@ impl Collaboration {
             Ok(next) => next,
             Err(err) => {
                 if redo {
-                    self.history.undo_blocking();
+                    self.history.undo()?;
                 } else {
-                    self.history.redo_blocking();
+                    self.history.redo()?;
                 }
+                self.writer.take();
                 return Err(err);
             }
         };
+        let update = self.update_since(&vector)?;
+        self.sync_writer(&update);
         if let Some(selection) = pin.and_then(|p| self.resolve_selection_in(&p, &next)) {
             let _ = next.select(selection);
         }
         self.editor = next;
-        Ok(self.update_since(&vector))
+        Ok(update)
     }
 }

@@ -100,7 +100,7 @@ remote.borrow_mut().receive(&update)?;
 
 ### `peers` and `RemoteCaret`
 
-Call `peers` as the view paints so a remote selection resolves against the current text. The result is a `Vec<RemoteCaret>` sorted by `client`, a `yrs::ClientID` that distinguishes users even if they share a name. Use `user` to draw a label and `selection` to draw a caret or range. A hidden or unresolved selection yields `None`.
+Call `peers` as the view paints so a remote selection resolves against the current text. The result is a `Vec<RemoteCaret>` sorted by `client`, a `u64` client ID that distinguishes users even if they share a name. Use `user` to draw a label and `selection` to draw a caret or range. A hidden or unresolved selection yields `None`.
 
 ```rust
 let peers = remote.borrow().peers(&bob);

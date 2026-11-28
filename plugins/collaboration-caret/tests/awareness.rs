@@ -18,7 +18,7 @@ fn remote_caret_tracks_text_and_disappears_on_disconnect() {
     let mut bob = Collaboration::from_update(
         &config,
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     let mut local = CollaborationCaret::new(&alice);

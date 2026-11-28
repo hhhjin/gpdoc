@@ -2,12 +2,12 @@
 use gpdoc_plugin::EditorConfig;
 use gpdoc_plugin::prelude::{DocPos, Document, Schema, Selection};
 use serde::{Deserialize, Serialize};
-use yrs::{Assoc, IndexedSequence, ReadTxn, StickyIndex, Text, XmlFragment, XmlOut};
+use y_octo::{DocSession, RelativePosition, SessionReadValue, TypeTarget};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RelativeSelection {
-    pub anchor: StickyIndex,
-    pub head: StickyIndex,
+    pub anchor: RelativePosition,
+    pub head: RelativePosition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     kind: Option<BoundaryKind>,
 }
@@ -26,49 +26,59 @@ enum Offsets {
 }
 
 struct Entry {
-    xml: XmlOut,
+    xml: TypeTarget,
     positions: Offsets,
 }
 
 pub(crate) struct Positions(Vec<Entry>);
 
 impl Positions {
-    pub fn new(tx: &impl ReadTxn, root: yrs::XmlFragmentRef, schema: &Schema) -> Self {
+    pub fn new(doc: &DocSession, root: &TypeTarget, schema: &Schema) -> Option<Self> {
         let mut out = Self(Vec::new());
-        out.visit(tx, XmlOut::Fragment(root), 0, schema);
-        out
+        out.visit(doc, root, 0, schema, true)?;
+        Some(out)
     }
 
-    fn visit(&mut self, tx: &impl ReadTxn, xml: XmlOut, pos: usize, schema: &Schema) -> usize {
-        let (end, positions) = match &xml {
-            XmlOut::Text(t) => {
-                let len = t.len(tx) as usize;
-                (pos + len, Offsets::Text { start: pos, len })
-            }
-            XmlOut::Element(el) if schema.node_type(el.tag()).is_some_and(|ty| ty.is_leaf()) => {
-                return pos + 1;
-            }
-            parent => {
-                let root = matches!(parent, XmlOut::Fragment(_));
-                let mut at = pos + usize::from(!root);
-                let mut boundaries = vec![at];
-                let children = match parent {
-                    XmlOut::Element(el) => el.children(tx),
-                    XmlOut::Fragment(f) => f.children(tx),
-                    _ => unreachable!(),
-                };
-                for child in children {
-                    at = self.visit(tx, child, at, schema);
-                    boundaries.push(at);
+    fn visit(
+        &mut self,
+        doc: &DocSession,
+        parent: &TypeTarget,
+        pos: usize,
+        schema: &Schema,
+        root: bool,
+    ) -> Option<usize> {
+        let mut at = pos + usize::from(!root);
+        let mut boundaries = vec![at];
+        for child in doc.read_array(parent).ok()? {
+            match child {
+                SessionReadValue::XmlText(id) => {
+                    let xml = id.into();
+                    let len = doc.read_text_len(&xml).ok()? as usize;
+                    self.0.push(Entry {
+                        xml,
+                        positions: Offsets::Text { start: at, len },
+                    });
+                    at += len;
                 }
-                (at + usize::from(!root), Offsets::Children(boundaries))
+                SessionReadValue::XmlElement { tag, identity } => {
+                    if schema.node_type(&tag).is_some_and(|ty| ty.is_leaf()) {
+                        at += 1;
+                    } else {
+                        at = self.visit(doc, &identity.into(), at, schema, false)?;
+                    }
+                }
+                _ => return None,
             }
-        };
-        self.0.push(Entry { xml, positions });
-        end
+            boundaries.push(at);
+        }
+        self.0.push(Entry {
+            xml: parent.clone(),
+            positions: Offsets::Children(boundaries),
+        });
+        Some(at + usize::from(!root))
     }
 
-    fn pin(&self, tx: &impl ReadTxn, pos: DocPos, node: bool) -> Option<StickyIndex> {
+    fn pin(&self, tx: &DocSession, pos: DocPos, node: bool) -> Option<RelativePosition> {
         for entry in &self.0 {
             let index = match &entry.positions {
                 Offsets::Text { start, len }
@@ -81,24 +91,18 @@ impl Positions {
                     Err(_) => continue,
                 },
                 _ => continue,
-            } as u32;
-            let assoc = if node { Assoc::After } else { Assoc::Before };
-            return match &entry.xml {
-                XmlOut::Text(t) => t.sticky_index(tx, index, assoc),
-                XmlOut::Element(el) => el.sticky_index(tx, index, assoc),
-                XmlOut::Fragment(f) => f.sticky_index(tx, index, assoc),
-            }
-            .or_else(|| Some(StickyIndex::from_type(tx, &entry.xml, assoc)));
+            } as u64;
+            return tx
+                .create_relative_position(&entry.xml, index, if node { 0 } else { -1 })
+                .ok();
         }
         None
     }
 
-    fn resolve(&self, tx: &impl ReadTxn, pin: &StickyIndex) -> Option<DocPos> {
-        let at = pin.get_offset(tx)?;
-        let entry = self
-            .0
-            .iter()
-            .find(|entry| entry.xml.as_ptr() == at.branch)?;
+    fn resolve(&self, tx: &y_octo::Doc, pin: &RelativePosition) -> Option<DocPos> {
+        let at = tx.resolve_relative_position(pin, true)?;
+        let target = TypeTarget::from(at.r#type);
+        let entry = self.0.iter().find(|entry| entry.xml == target)?;
         match &entry.positions {
             Offsets::Text { start, len } if at.index as usize <= *len => {
                 Some(DocPos(start + at.index as usize))
@@ -110,7 +114,7 @@ impl Positions {
 
     pub fn relative(
         &self,
-        tx: &impl ReadTxn,
+        tx: &DocSession,
         selection: Selection,
         doc: &Document,
         config: &EditorConfig,
@@ -137,7 +141,7 @@ impl Positions {
 
     pub fn absolute(
         &self,
-        tx: &impl ReadTxn,
+        tx: &y_octo::Doc,
         relative: &RelativeSelection,
         config: &EditorConfig,
     ) -> Option<Selection> {

@@ -35,7 +35,7 @@ let config = EditorConfig::builder()
 let editor = Editor::from_document(&config, vec![Node::text("paragraph", "Hi")])?;
 let mut alice = Collaboration::new(editor, "default")?;
 
-let seed = alice.update_since(&StateVector::default());
+let seed = alice.update_since(&StateVector::default())?;
 let mut bob = Collaboration::from_update(&config, "default", &seed)?;
 ```
 
@@ -106,11 +106,11 @@ if let Some(pin) = alice.relative_selection() {
 
 ### `awareness`
 
-For custom presence, create a Yrs awareness instance with the session's client ID. To display other users' names and selections, use [Collaboration caret](/docs/plugins/collaboration/collaboration-caret/).
+For custom presence, create a y-octo awareness instance with the session's client ID. To display other users' names and selections, use [Collaboration caret](/docs/plugins/collaboration/collaboration-caret/).
 
 ```rust
 let awareness = alice.awareness();
-let local_client = awareness.client_id();
+let local_client = awareness.local_id();
 println!("Presence client: {local_client}");
 ```
 
@@ -118,11 +118,11 @@ println!("Presence client: {local_client}");
 
 ### `state_vector` and `update_since`
 
-Each peer's state vector records the changes it already has. Pass the receiver's vector to the sender's `update_since` to encode the missing changes. When both peers edit offline, exchange updates in both directions. Your app supplies the transport and persistence for these document updates.
+Each peer's state vector records the changes it already has. Pass the receiver's vector to the sender's `update_since` to encode the missing changes. When both peers edit offline, exchange updates in both directions. Use `?` to propagate encoding errors from `update_since`. To send the state vector itself, call `StateVector::encode_v1` and decode the bytes with `StateVector::decode_v1` on the other peer.
 
 ```rust
-let for_bob = alice.update_since(&bob.state_vector());
-let for_alice = bob.update_since(&alice.state_vector());
+let for_bob = alice.update_since(&bob.state_vector())?;
+let for_alice = bob.update_since(&alice.state_vector())?;
 bob.apply_update(&for_bob)?;
 alice.apply_update(&for_alice)?;
 ```

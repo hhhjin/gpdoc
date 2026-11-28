@@ -15,7 +15,7 @@ impl Peers {
         let bob = Collaboration::from_update(
             editor.config(),
             "default",
-            &alice.update_since(&StateVector::default()),
+            &alice.update_since(&StateVector::default())?,
         )?;
         let alice_caret = CollaborationCaret::new(&alice);
         let bob_caret = CollaborationCaret::new(&bob);

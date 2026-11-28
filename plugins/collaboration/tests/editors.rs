@@ -18,7 +18,7 @@ fn pair() -> (Collaboration, Collaboration) {
     let bob = Collaboration::from_update(
         &config,
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     (alice, bob)
@@ -76,14 +76,12 @@ fn concurrent_mark_and_typing_keep_character_identity() {
 
 #[test]
 fn invalid_remote_content_and_failed_local_edits_leave_both_states_intact() {
-    use yrs::{Doc, ReadTxn, Transact, XmlElementPrelim, XmlFragment};
     let (mut alice, _) = pair();
-    let bad = Doc::new();
-    let xml = bad.get_or_insert_xml_fragment("default");
-    xml.push_back(&mut bad.transact_mut(), XmlElementPrelim::empty("unknown"));
-    let update = bad
-        .transact()
-        .encode_state_as_update_v1(&StateVector::default());
+    let bad = y_octo::Doc::new();
+    let mut xml = bad.get_or_create_xml_fragment("default").unwrap();
+    xml.push(bad.create_xml_element("unknown").unwrap())
+        .unwrap();
+    let update = bad.encode_update_v1().unwrap();
     let before = alice.state_vector();
     assert!(alice.apply_update(&update).is_err());
     assert!(
@@ -127,7 +125,7 @@ fn deleting_first_of_identical_siblings_keeps_the_concurrently_edited_last_block
     let mut bob = Collaboration::from_update(
         &config,
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     let (_, delete) = alice
@@ -179,7 +177,7 @@ fn repeated_characters_keep_their_identity_in_a_concurrent_deletion() {
     let mut bob = Collaboration::from_update(
         &config,
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     alice
@@ -225,7 +223,7 @@ fn text_from_two_concurrent_insertions_into_empty_blocks_keeps_both_remote_caret
     let mut bob = Collaboration::from_update(
         &config,
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     let (_, a) = alice.edit(|ed| ed.insert_text("A")).unwrap();
@@ -247,7 +245,7 @@ fn text_from_two_concurrent_insertions_into_empty_blocks_keeps_both_remote_caret
 }
 
 #[test]
-fn a_remote_transaction_rejected_by_a_local_doc_filter_leaves_the_yrs_state_intact() {
+fn a_remote_transaction_rejected_by_a_local_doc_filter_leaves_the_crdt_state_intact() {
     let (mut sender, _) = pair();
     let config = gpdoc_plugin::core::EditorConfig::builder()
         .plugin(paragraph())
@@ -260,7 +258,7 @@ fn a_remote_transaction_rejected_by_a_local_doc_filter_leaves_the_yrs_state_inta
     let mut receiver = Collaboration::from_update(
         &config,
         "default",
-        &sender.update_since(&StateVector::default()),
+        &sender.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     let before = receiver.state_vector();
@@ -315,7 +313,7 @@ fn rectangular_selection_round_trips_between_kits_and_clears_each_cell_once() {
     let mut bob = Collaboration::from_update(
         &config(),
         "default",
-        &alice.update_since(&StateVector::default()),
+        &alice.update_since(&StateVector::default()).unwrap(),
     )
     .unwrap();
     let selection = bob
@@ -354,4 +352,82 @@ fn rectangular_selection_round_trips_between_kits_and_clears_each_cell_once() {
         .map(|(_, node)| node.text_content())
         .collect();
     assert_eq!(contents, ["X", ""]);
+}
+
+#[test]
+fn a_failed_crdt_write_preserves_the_document_and_redo_history() {
+    use gpdoc_plugin::core::{Edit, Editor, EditorConfig};
+    use gpdoc_plugin::prelude::{AttrSpec, AttrSpecs, AttrType, Attrs, NodeSpec, Value};
+    let config = EditorConfig::builder()
+        .plugin(paragraph())
+        .plugin(Plugin::<()>::new("section", |p| {
+            p.node(
+                NodeSpec::block("section")
+                    .group("block")
+                    .attrs(AttrSpecs::from([(
+                        "data".into(),
+                        AttrSpec::required(AttrType::Json),
+                    )])),
+            );
+        }))
+        .build()
+        .unwrap();
+    let editor = Editor::from_document(&config, vec![Node::text("paragraph", "hello")]).unwrap();
+    let mut peer = Collaboration::new(editor, "default").unwrap();
+    peer.edit(|ed| ed.insert_text("saved")).unwrap();
+    peer.undo().unwrap();
+    let snapshot = peer.update_since(&StateVector::default()).unwrap();
+
+    // The editor accepts the JSON attribute. Its nesting exceeds the Yjs V1
+    // decoder limit only after the writer has produced the whole transaction.
+    let nested = (0..130).fold(Value::Null, |value, _| Value::Array(vec![value]));
+    let deep = Node::leaf("section", Attrs::from([("data".into(), nested)]));
+    let result = peer.edit(|ed| {
+        ed.insert_text("discard")?;
+        let end = DocPos(ed.document().size());
+        let mut tx = ed.transaction();
+        tx.push(Edit::ReplaceNodes {
+            range: end..end,
+            nodes: vec![deep],
+        });
+        ed.apply(tx)
+    });
+    assert!(
+        matches!(result, Err(gpdoc_plugin_collaboration::Error::Crdt(_))),
+        "{result:?}"
+    );
+    assert_eq!(
+        peer.update_since(&StateVector::default()).unwrap(),
+        snapshot
+    );
+    assert_eq!(text(&peer), "hello");
+    peer.redo().unwrap();
+    peer.edit(|ed| ed.insert_text("next")).unwrap();
+    let copy = Collaboration::from_update(
+        &config,
+        "default",
+        &peer.update_since(&StateVector::default()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(text(&copy), text(&peer));
+    assert!(text(&copy).contains("saved"));
+    assert!(text(&copy).contains("next"));
+}
+
+#[test]
+fn a_shared_type_inside_an_xml_attribute_is_rejected() {
+    let (mut peer, _) = pair();
+    let doc = y_octo::Doc::new();
+    let mut root = doc.get_or_create_xml_fragment("default").unwrap();
+    let mut element = doc.create_xml_element("paragraph").unwrap();
+    element
+        .set_attribute("bad", doc.create_map().unwrap())
+        .unwrap();
+    root.push(element).unwrap();
+    let before = peer.state_vector();
+    assert!(matches!(
+        peer.apply_update(&doc.encode_update_v1().unwrap()),
+        Err(gpdoc_plugin_collaboration::Error::Content(_))
+    ));
+    assert_eq!(peer.state_vector(), before);
 }

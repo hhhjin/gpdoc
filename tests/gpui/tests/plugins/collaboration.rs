@@ -89,7 +89,7 @@ fn edits_and_carets_follow_the_shared_session() {
             let mut peer = Collaboration::from_update(
                 local.editor().config(),
                 "default",
-                &local.update_since(&StateVector::default()),
+                &local.update_since(&StateVector::default()).unwrap(),
             )
             .unwrap();
             peer.select(Selection::Text {

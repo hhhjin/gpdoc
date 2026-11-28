@@ -23,6 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     peer.edit(|ed| ed.run(gpdoc_plugin_bold::Unset))?;
     peer.select(Selection::caret(DocPos(9)))?;
     peer.edit(|ed| ed.insert_text("!"))?;
-    std::io::stdout().write_all(&peer.update_since(&vector))?;
+    std::io::stdout().write_all(&peer.update_since(&vector)?)?;
     Ok(())
 }

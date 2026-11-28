@@ -2,10 +2,9 @@
 use crate::Error;
 use gpdoc_plugin::core::{Affinity, PositionMap};
 use gpdoc_plugin::prelude::{Attrs, Content, ContentRef, DocPos, Mark, Node, Schema, TextRun};
-use yrs::types::Attrs as Formats;
-use yrs::{
-    Any, Out, ReadTxn, Text, TransactionMut, Xml, XmlElementPrelim, XmlFragment, XmlOut,
-    XmlTextPrelim, XmlTextRef,
+use y_octo::{
+    Any, Doc, DocSession, SessionReadValue, SessionValue, TextAttributes as Formats, TextDeltaOp,
+    TextInsert, Transaction, TypeTarget, Value, XMLFragment,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,35 +26,95 @@ pub(crate) struct Run {
 fn encode_attrs(attrs: &Attrs) -> Result<Formats, Error> {
     attrs
         .iter()
-        .map(|(k, v)| Ok((k.as_str().into(), serde_json::from_value(v.clone())?)))
+        .map(|(k, v)| Ok((k.as_str().into(), attribute_value(v)?)))
         .collect()
+}
+
+// JSON numbers represent JavaScript Numbers in Tiptap. Preserve integers that
+// cannot be represented exactly as a Number using the Yjs bigint encoding.
+fn attribute_value(value: &serde_json::Value) -> Result<Any, Error> {
+    use serde_json::Value as Json;
+    Ok(match value {
+        Json::Number(number) if number.is_f64() => Any::from(number.as_f64().unwrap()),
+        Json::Number(number) => {
+            let integer = number
+                .as_i64()
+                .ok_or_else(|| Error::Content(format!("attribute integer {number} exceeds i64")))?;
+            let float = integer as f64;
+            if float as i128 == i128::from(integer) {
+                Any::from(float)
+            } else {
+                Any::BigInt64(integer)
+            }
+        }
+        Json::Array(values) => Any::Array(
+            values
+                .iter()
+                .map(attribute_value)
+                .collect::<Result<_, _>>()?,
+        ),
+        Json::Object(values) => Any::Object(Box::new(
+            values
+                .iter()
+                .map(|(k, v)| Ok((k.clone(), attribute_value(v)?)))
+                .collect::<Result<_, Error>>()?,
+        )),
+        Json::Bool(value) => Any::from(*value),
+        Json::String(value) => Any::from(value.clone()),
+        Json::Null => Any::Null,
+    })
+}
+
+fn decode_attribute(value: &Any) -> Result<serde_json::Value, Error> {
+    use serde_json::Value as Json;
+    let number = match value {
+        Any::Float32(n) => f64::from(n.0),
+        Any::Float64(n) => n.0,
+        Any::Object(entries) => {
+            return Ok(Json::Object(
+                entries
+                    .iter()
+                    .map(|(key, val)| Ok((key.clone(), decode_attribute(val)?)))
+                    .collect::<Result<_, Error>>()?,
+            ));
+        }
+        Any::Array(values) => {
+            return Ok(Json::Array(
+                values
+                    .iter()
+                    .map(decode_attribute)
+                    .collect::<Result<_, _>>()?,
+            ));
+        }
+        other => return Ok(serde_json::to_value(other)?),
+    };
+    // Yjs can encode an integer as a float. Keep it valid for Integer attributes.
+    Ok(
+        if number.fract() == 0.0 && (i64::MIN as f64..-(i64::MIN as f64)).contains(&number) {
+            Json::from(number as i64)
+        } else {
+            Json::from(number)
+        },
+    )
 }
 
 fn decode_attrs(attrs: &Formats) -> Result<Attrs, Error> {
     attrs
         .iter()
-        .map(|(k, v)| {
-            let value = serde_json::to_value(v)?;
-            Ok((k.to_string(), value))
-        })
+        .map(|(k, v)| Ok((k.clone(), decode_attribute(v)?)))
         .collect()
 }
 
-pub(crate) fn encode(nodes: &[Node]) -> Result<Vec<Child>, Error> {
+pub(crate) fn encode(nodes: &[Node], depth: usize) -> Result<Vec<Child>, Error> {
+    check_depth(depth)?;
     let mut result = Vec::new();
     for node in nodes {
         if let ContentRef::Text(run) = node.content() {
             let mut marks = Formats::new();
             for mark in run.marks {
-                let attrs = encode_attrs(&mark.attrs)?
-                    .into_iter()
-                    .map(|(key, v)| (key.to_string(), v))
-                    .collect();
+                let attrs = encode_attrs(&mark.attrs)?.into_iter().collect();
                 if marks
-                    .insert(
-                        mark.kind.as_str().into(),
-                        Any::Map(std::sync::Arc::new(attrs)),
-                    )
+                    .insert(mark.kind.as_str().into(), Any::Object(Box::new(attrs)))
                     .is_some()
                 {
                     return Err(Error::Content("overlapping marks of the same kind".into()));
@@ -78,8 +137,11 @@ pub(crate) fn encode(nodes: &[Node]) -> Result<Vec<Child>, Error> {
             ));
         }
         let children = match node.content() {
-            ContentRef::Blocks(nodes) | ContentRef::Inline(nodes) => encode(nodes)?,
-            _ => vec![],
+            ContentRef::Blocks(nodes) | ContentRef::Inline(nodes) => encode(nodes, depth + 1)?,
+            _ => {
+                check_depth(depth + 1)?;
+                vec![]
+            }
         };
         result.push(Child::Element {
             kind: node.kind.clone(),
@@ -98,13 +160,10 @@ pub(crate) fn decode(schema: &Schema, children: Vec<Child>) -> Result<Vec<Node>,
                 for run in runs {
                     let mut marks = Vec::new();
                     for (key, attrs) in run.marks {
-                        let Any::Map(values) = attrs else {
+                        let Any::Object(values) = attrs else {
                             return Err(Error::Content("invalid Yjs mark".into()));
                         };
-                        let attrs = values
-                            .iter()
-                            .map(|(k, v)| (k.as_str().into(), v.clone()))
-                            .collect();
+                        let attrs = values.into_iter().collect();
                         let name = key
                             .rsplit_once("--")
                             .and_then(|(name, hash)| {
@@ -149,58 +208,91 @@ pub(crate) fn decode(schema: &Schema, children: Vec<Child>) -> Result<Vec<Node>,
     Ok(nodes)
 }
 
-pub(crate) fn read(
-    tx: &impl ReadTxn,
-    parent: &impl XmlFragment,
-    depth: usize,
-) -> Result<Vec<Child>, Error> {
+pub(crate) fn read(doc: &Doc, root: &XMLFragment) -> Result<Vec<Child>, Error> {
+    doc.transact(|tx| read_children(tx, tx.xml_fragment(root)?.iter(), 0))?
+}
+
+fn check_depth(depth: usize) -> Result<(), Error> {
     if depth > 128 {
         return Err(Error::Content("Yjs XML nesting exceeds 128".into()));
     }
-    parent
-        .children(tx)
-        .map(|node| match node {
-            XmlOut::Text(text) => {
-                let runs = text
-                    .diff(tx, |_| ())
-                    .into_iter()
-                    .map(|delta| {
-                        let Out::Any(Any::String(value)) = delta.insert else {
-                            return Err(Error::Content("unsupported inline Yjs embed".into()));
-                        };
-                        Ok(Run {
-                            text: value.to_string(),
-                            marks: delta.attributes.map(|attrs| *attrs).unwrap_or_default(),
-                        })
-                    })
-                    .collect::<Result<_, _>>()?;
+    Ok(())
+}
+
+fn read_children(
+    tx: &Transaction,
+    children: impl Iterator<Item = Value>,
+    depth: usize,
+) -> Result<Vec<Child>, Error> {
+    check_depth(depth)?;
+    children
+        .map(|child| match child {
+            Value::XMLText(text) => {
+                // identity_runs also reports shared-type embeds that to_delta skips.
+                let mut runs: Vec<Run> = Vec::new();
+                for run in tx.xml_text(&text)?.identity_runs()? {
+                    let TextInsert::Text(text) = run.insert else {
+                        return Err(Error::Content("unsupported inline Yjs embed".into()));
+                    };
+                    if let Some(last) = runs.last_mut()
+                        && last.marks == run.attributes
+                    {
+                        last.text.push_str(&text);
+                    } else {
+                        runs.push(Run {
+                            text,
+                            marks: run.attributes,
+                        });
+                    }
+                }
                 Ok(Child::Text(runs))
             }
-            XmlOut::Element(el) => {
+            Value::XMLElement(el) => {
+                let el = tx.xml_element(&el)?;
                 let attrs = el
-                    .attributes(tx)
-                    .map(|(k, v)| {
-                        let Out::Any(value) = v else {
-                            return Err(Error::Content(format!("invalid attribute {k}")));
-                        };
-                        Ok((k.into(), value))
+                    .attributes()
+                    .into_iter()
+                    .map(|(key, value)| match value {
+                        Value::Any(value) => Ok((key, value)),
+                        _ => Err(Error::Content(format!("invalid XML attribute {key}"))),
                     })
                     .collect::<Result<_, _>>()?;
                 Ok(Child::Element {
-                    kind: el.tag().to_string(),
+                    kind: el.tag_name().to_owned(),
                     attrs,
-                    children: read(tx, &el, depth + 1)?,
+                    children: read_children(tx, el.iter(), depth + 1)?,
                 })
             }
-            XmlOut::Fragment(_) => Err(Error::Content("nested fragment".into())),
+            _ => Err(Error::Content("unexpected XML child".into())),
         })
         .collect()
 }
 
-pub(crate) fn seed(tx: &mut TransactionMut, parent: &impl XmlFragment, nodes: &[Child]) {
-    for (i, child) in nodes.iter().enumerate() {
-        insert(tx, parent, i as u32, child);
+fn xml_value(child: &Child) -> SessionValue {
+    match child {
+        Child::Element {
+            kind,
+            attrs,
+            children,
+        } => SessionValue::XmlElement {
+            tag: kind.clone(),
+            attrs: attrs.clone().into_iter().collect(),
+            children: children.iter().map(xml_value).collect(),
+        },
+        Child::Text(runs) => SessionValue::XmlText(
+            runs.iter()
+                .map(|r| TextDeltaOp::Insert {
+                    insert: TextInsert::Text(r.text.clone()),
+                    format: Some(r.marks.clone()),
+                })
+                .collect(),
+        ),
     }
+}
+
+pub(crate) fn seed(tx: &mut DocSession, parent: &TypeTarget, nodes: &[Child]) -> Result<(), Error> {
+    tx.array_push(parent, nodes.iter().map(xml_value).collect())?;
+    Ok(())
 }
 
 struct Group<'a> {
@@ -237,32 +329,32 @@ fn size(child: &Child, schema: &Schema) -> usize {
 }
 
 pub(crate) fn reconcile(
-    tx: &mut TransactionMut,
-    root: &impl XmlFragment,
+    tx: &mut DocSession,
+    root: &TypeTarget,
     old: &[Child],
     new: &[Child],
     schema: &Schema,
     map: &PositionMap,
-) {
+) -> Result<(), Error> {
     let mut edit = Reconcile { tx, schema, map };
-    edit.children(root, old, 0, new, 0);
+    edit.children(root, old, 0, new, 0)
 }
 
-struct Reconcile<'a, 'doc> {
-    tx: &'a mut TransactionMut<'doc>,
+struct Reconcile<'a> {
+    tx: &'a mut DocSession,
     schema: &'a Schema,
     map: &'a PositionMap,
 }
 
-impl Reconcile<'_, '_> {
+impl Reconcile<'_> {
     fn children(
         &mut self,
-        parent: &impl XmlFragment,
+        parent: &TypeTarget,
         old: &[Child],
         old_start: usize,
         new: &[Child],
         new_start: usize,
-    ) {
+    ) -> Result<(), Error> {
         let old = groups(old, old_start, self.schema);
         let new = groups(new, new_start, self.schema);
         let (mut cursor, mut next) = (0, 0);
@@ -289,29 +381,39 @@ impl Reconcile<'_, '_> {
                     })
             };
             let Some(skip) = candidate else {
-                parent.remove_range(self.tx, cursor, group.parts.len() as u32);
+                self.tx
+                    .array_remove(parent, cursor, group.parts.len() as u64)?;
                 continue;
             };
             for g in &new[next..next + skip] {
                 for child in g.parts {
-                    insert(self.tx, parent, cursor, child);
+                    self.tx
+                        .array_insert(parent, cursor, vec![xml_value(child)])?;
                     cursor += 1;
                 }
             }
             next += skip;
-            self.patch(parent, cursor, group, &new[next]);
-            cursor += group.parts.len() as u32;
+            self.patch(parent, cursor, group, &new[next])?;
+            cursor += group.parts.len() as u64;
             next += 1;
         }
         for g in &new[next..] {
             for child in g.parts {
-                insert(self.tx, parent, cursor, child);
+                self.tx
+                    .array_insert(parent, cursor, vec![xml_value(child)])?;
                 cursor += 1;
             }
         }
+        Ok(())
     }
 
-    fn patch(&mut self, parent: &impl XmlFragment, cursor: u32, old: &Group, new: &Group) {
+    fn patch(
+        &mut self,
+        parent: &TypeTarget,
+        cursor: u64,
+        old: &Group,
+        new: &Group,
+    ) -> Result<(), Error> {
         match (&old.parts[0], &new.parts[0]) {
             (
                 Child::Element {
@@ -323,18 +425,23 @@ impl Reconcile<'_, '_> {
                     ..
                 },
             ) => {
-                let Some(XmlOut::Element(el)) = parent.get(self.tx, cursor) else {
-                    unreachable!("read from the same transaction")
+                let Some(SessionReadValue::XmlElement { identity, .. }) =
+                    self.tx.read_array_at(parent, cursor)?
+                else {
+                    return Err(Error::Content(
+                        "missing XML element during reconciliation".into(),
+                    ));
                 };
+                let el = identity.into();
                 for key in attrs.keys().filter(|k| !values.contains_key(*k)) {
-                    el.remove_attribute(self.tx, key);
+                    self.tx.xml_remove_attr(&el, key)?;
                 }
                 for (key, value) in values {
                     if attrs.get(key) != Some(value) {
-                        el.insert_attribute(self.tx, key.clone(), value.clone());
+                        self.tx.xml_set_attr(&el, key.clone(), value.clone())?;
                     }
                 }
-                self.children(&el, children, old.start + 1, kids, new.start + 1);
+                self.children(&el, children, old.start + 1, kids, new.start + 1)?;
             }
             (Child::Text(_), Child::Text(runs)) => {
                 let chars = characters(runs);
@@ -345,8 +452,12 @@ impl Reconcile<'_, '_> {
                     let Child::Text(prev) = part else {
                         unreachable!()
                     };
-                    let Some(XmlOut::Text(text)) = parent.get(self.tx, cursor + i as u32) else {
-                        unreachable!("same transaction")
+                    let Some(SessionReadValue::XmlText(text)) =
+                        self.tx.read_array_at(parent, cursor + i as u64)?
+                    else {
+                        return Err(Error::Content(
+                            "missing XML text during reconciliation".into(),
+                        ));
                     };
                     let end = old_pos
                         + prev
@@ -370,13 +481,13 @@ impl Reconcile<'_, '_> {
                     }
                     update_text(
                         self.tx,
-                        &text,
+                        &text.into(),
                         &characters(prev),
                         old_pos,
                         &chars[target..limit],
                         new_pos,
                         self.map,
-                    );
+                    )?;
                     target = limit;
                     old_pos = end;
                     new_pos = next_pos;
@@ -384,35 +495,7 @@ impl Reconcile<'_, '_> {
             }
             _ => unreachable!("matched XML type"),
         }
-    }
-}
-
-fn insert(tx: &mut TransactionMut, parent: &impl XmlFragment, at: u32, child: &Child) {
-    match child {
-        Child::Element {
-            kind,
-            attrs,
-            children,
-        } => {
-            let el = parent.insert(tx, at, XmlElementPrelim::empty(kind.as_str()));
-            for (key, v) in attrs {
-                el.insert_attribute(tx, key.clone(), v.clone());
-            }
-            for (i, c) in children.iter().enumerate() {
-                insert(tx, &el, i as u32, c);
-            }
-        }
-        Child::Text(runs) => {
-            let text = parent.insert(tx, at, XmlTextPrelim::new(""));
-            append_runs(tx, &text, 0, runs);
-        }
-    }
-}
-
-fn append_runs(tx: &mut TransactionMut, text: &XmlTextRef, mut offset: u32, runs: &[Run]) {
-    for run in runs {
-        text.insert_with_attributes(tx, offset, &run.text, run.marks.clone());
-        offset += run.text.encode_utf16().count() as u32;
+        Ok(())
     }
 }
 
@@ -423,14 +506,14 @@ fn characters(runs: &[Run]) -> Vec<(char, &Formats)> {
 }
 
 fn update_text(
-    tx: &mut TransactionMut,
-    text: &XmlTextRef,
+    tx: &mut DocSession,
+    text: &TypeTarget,
     old: &[(char, &Formats)],
     mut old_pos: usize,
     new: &[(char, &Formats)],
     new_pos: usize,
     map: &PositionMap,
-) {
+) -> Result<(), Error> {
     let mut positions = Vec::with_capacity(new.len());
     let mut pos = new_pos;
     for (ch, _) in new {
@@ -451,39 +534,52 @@ fn update_text(
     let (mut prev, mut next, mut offset) = (0, 0, 0);
     for group in anchors.chunk_by(|a, b| a.0 + 1 == b.0 && a.1 + 1 == b.1) {
         let (a, b) = group[0];
-        replace_chars(tx, text, &mut offset, &old[prev..a], &new[next..b]);
+        replace_chars(tx, text, &mut offset, &old[prev..a], &new[next..b])?;
         prev = a + group.len();
         next = b + group.len();
-        format_changed(tx, text, &mut offset, &old[a..prev], &new[b..next]);
+        format_changed(tx, text, &mut offset, &old[a..prev], &new[b..next])?;
     }
-    replace_chars(tx, text, &mut offset, &old[prev..], &new[next..]);
+    replace_chars(tx, text, &mut offset, &old[prev..], &new[next..])
 }
 
 fn replace_chars(
-    tx: &mut TransactionMut,
-    text: &XmlTextRef,
-    offset: &mut u32,
+    tx: &mut DocSession,
+    text: &TypeTarget,
+    offset: &mut u64,
     old: &[(char, &Formats)],
     new: &[(char, &Formats)],
-) {
-    let removed = old.iter().map(|(ch, _)| ch.len_utf16() as u32).sum();
+) -> Result<(), Error> {
+    let removed = old.iter().map(|(ch, _)| ch.len_utf16() as u64).sum();
     if removed > 0 {
-        text.remove_range(tx, *offset, removed);
+        tx.text_remove(text, *offset, removed)?;
     }
     for run in new.chunk_by(|a, b| a.1 == b.1) {
         let string: String = run.iter().map(|(ch, _)| *ch).collect();
-        text.insert_with_attributes(tx, *offset, &string, run[0].1.clone());
-        *offset += string.encode_utf16().count() as u32;
+        tx.text_apply_delta(
+            text,
+            &[
+                TextDeltaOp::Retain {
+                    retain: *offset,
+                    format: None,
+                },
+                TextDeltaOp::Insert {
+                    insert: TextInsert::Text(string.clone()),
+                    format: Some(run[0].1.clone()),
+                },
+            ],
+        )?;
+        *offset += string.encode_utf16().count() as u64;
     }
+    Ok(())
 }
 
 fn format_changed(
-    tx: &mut TransactionMut,
-    text: &XmlTextRef,
-    offset: &mut u32,
+    tx: &mut DocSession,
+    text: &TypeTarget,
+    offset: &mut u64,
     old: &[(char, &Formats)],
     new: &[(char, &Formats)],
-) {
+) -> Result<(), Error> {
     let mut i = 0;
     while i < old.len() {
         let len = (i + 1..old.len())
@@ -492,7 +588,7 @@ fn format_changed(
             + 1;
         let units = old[i..i + len]
             .iter()
-            .map(|(ch, _)| ch.len_utf16() as u32)
+            .map(|(ch, _)| ch.len_utf16() as u64)
             .sum();
         if old[i].1 != new[i].1 {
             let mut changed = Formats::new();
@@ -506,9 +602,27 @@ fn format_changed(
                     changed.insert(key.clone(), val.clone());
                 }
             }
-            text.format(tx, *offset, units, changed);
+            tx.text_format(text, *offset, units, changed)?;
         }
         *offset += units;
         i += len;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Any, attribute_value, decode_attribute};
+    use serde_json::json;
+
+    #[test]
+    fn numeric_attributes_keep_their_yjs_number_type_and_round_trip_losslessly() {
+        assert_eq!(attribute_value(&json!(-7)).unwrap(), Any::Integer(-7));
+        let attrs = json!({"nested": [-4_294_967_297_i64, 8.25, i64::MAX]});
+        assert_eq!(
+            decode_attribute(&attribute_value(&attrs).unwrap()).unwrap(),
+            attrs
+        );
+        assert!(attribute_value(&json!(u64::MAX)).is_err());
     }
 }

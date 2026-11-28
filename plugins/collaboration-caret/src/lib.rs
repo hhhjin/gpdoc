@@ -1,4 +1,4 @@
-//! Transient remote selections using Yrs and the Yjs awareness protocol.
+//! Transient remote selections using y-octo and the Yjs awareness protocol.
 #[cfg(feature = "gpui")]
 mod view;
 #[cfg(feature = "gpui")]
@@ -7,20 +7,17 @@ pub use view::{
 };
 
 use gpdoc_plugin::core::Selection;
-use gpdoc_plugin_collaboration::{Collaboration, Decode, Encode, RelativeSelection};
+use gpdoc_plugin_collaboration::{Collaboration, RelativeSelection};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use yrs::{
-    ClientID,
-    sync::{Awareness, awareness::AwarenessUpdate},
-};
+use y_octo::Awareness;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Awareness(#[from] yrs::sync::awareness::Error),
+    Awareness(#[from] y_octo::JwstCodecError),
     #[error(transparent)]
-    Decode(#[from] yrs::encoding::read::Error),
+    Json(#[from] serde_json::Error),
 }
 
 /// Tiptap's `user` object. Typical keys include `name` and `color`.
@@ -34,7 +31,7 @@ struct State {
 }
 
 pub struct RemoteCaret {
-    pub client: ClientID,
+    pub client: u64,
     pub user: User,
     pub selection: Option<Selection>,
 }
@@ -58,45 +55,45 @@ impl CollaborationCaret {
         focused: bool,
     ) -> Result<Vec<u8>, Error> {
         let cursor = focused.then(|| session.relative_selection()).flatten();
-        self.awareness.set_local_state(State { user, cursor })?;
+        self.awareness
+            .set_local_state(serde_json::to_string(&State { user, cursor })?);
         self.local_update()
     }
 
     /// Send the returned update before disconnecting to remove this peer immediately.
     pub fn leave(&mut self) -> Result<Vec<u8>, Error> {
-        self.awareness.remove_state(self.awareness.client_id());
+        self.awareness.clear_local_state();
         self.local_update()
     }
 
     fn local_update(&self) -> Result<Vec<u8>, Error> {
         Ok(self
             .awareness
-            .update_with_clients([self.awareness.client_id()])?
-            .encode_v1())
+            .encode_update(Some(&[self.awareness.local_id()]))?)
     }
 
     pub fn receive(&mut self, update: &[u8]) -> Result<(), Error> {
-        Ok(self
-            .awareness
-            .apply_update(AwarenessUpdate::decode_v1(update)?)?)
+        self.awareness.apply_update_v1(update)?;
+        Ok(())
     }
 
     /// Resolve received positions against the current document each time the view paints.
     pub fn peers(&self, session: &Collaboration) -> Vec<RemoteCaret> {
         let mut peers: Vec<_> = self
             .awareness
+            .get_states()
             .iter()
             .filter_map(|(id, client)| {
-                if id == self.awareness.client_id() {
+                if *id == self.awareness.local_id() {
                     return None;
                 }
-                let state: State = serde_json::from_str(client.data.as_deref()?).ok()?;
+                let state: State = serde_json::from_str(client.content()).ok()?;
                 let selection = state
                     .cursor
                     .and_then(|pin| session.resolve_selection(&pin))
                     .filter(|s| s.validate(session.editor().document()).is_ok());
                 Some(RemoteCaret {
-                    client: id,
+                    client: *id,
                     user: state.user,
                     selection,
                 })

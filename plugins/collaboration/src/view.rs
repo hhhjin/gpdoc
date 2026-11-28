@@ -1,4 +1,4 @@
-//! GPUI binding for a Yrs document session.
+//! GPUI binding for a Yjs document session.
 use crate::Collaboration;
 use gpdoc::{EditSession, EditorView, SessionUpdate};
 use gpdoc_plugin::core::{Editor as CoreEditor, Error};
