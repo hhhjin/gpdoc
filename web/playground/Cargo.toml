@@ -72,7 +72,7 @@ gpdoc-plugin-trailing-node.workspace = true
 gpdoc-plugin-typography.workspace = true
 gpdoc-plugin-unique-id.workspace = true
 gpui_web = { package = "gpui-web-gpui-unofficial", version = "=1.29.1", default-features = false }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlAudioElement"] }
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 

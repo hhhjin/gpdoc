@@ -6,7 +6,7 @@ mod completion;
 pub(crate) mod completion_views;
 
 #[path = "format_menu.rs"]
-mod format_menu;
+pub(crate) mod format_menu;
 #[path = "menu_icons.rs"]
 mod menu_icons;
 

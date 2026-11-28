@@ -1,24 +1,23 @@
 ---
 interface Props {
-  kind: "format" | "json" | "plugin";
+  kind: "format" | "json";
   title: string;
   hint: string;
-  plugin?: string;
 }
 
-const { kind, title, hint, plugin } = Astro.props;
+const { kind, title, hint } = Astro.props;
 ---
 
-<form class="example not-content" data-doc-example={kind} data-plugin={plugin} aria-label={title}>
+<form class="example not-content" data-doc-example={kind} aria-label={title}>
   <fieldset disabled>
-    {kind !== "plugin" && <div class="example-header">
+    <div class="example-header">
       <div>
         <p class="example-title">{title}</p>
         <p class="example-hint">{hint}</p>
       </div>
       <button class="example-reset" type="button" data-reset>Reset</button>
-    </div>}
-    <div class:list={["example-body", { "plugin-body": kind === "plugin" }]}>
+    </div>
+    <div class="example-body">
       <slot />
     </div>
   </fieldset>
@@ -70,11 +69,6 @@ const { kind, title, hint, plugin } = Astro.props;
     display: grid;
     gap: 0.875rem;
     padding: 1rem 1.125rem;
-  }
-
-  .plugin-body {
-    display: block;
-    padding: 0;
   }
 
   .example-status {
@@ -172,19 +166,9 @@ const { kind, title, hint, plugin } = Astro.props;
     color: inherit;
   }
 
-  .example[data-plugin="highlight"] :global(mark) {
-    background-color: #ffde66;
-    color: #181818;
-  }
-
-  .example[data-plugin="highlight"] :global(mark::selection) {
-    background-color: #ffd23f;
-    color: #181818;
-  }
-
   @media (max-width: 30rem) {
     .example-header,
-    .example-body:not(.plugin-body),
+    .example-body,
     .example-status {
       padding-inline: 0.75rem;
     }

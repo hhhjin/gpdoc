@@ -21,7 +21,7 @@ fn menu(label: &'static str) -> impl IntoElement {
         .child(label)
 }
 
-struct ExampleSurface(gpui::Entity<gpdoc::EditorView>);
+pub(super) struct ExampleSurface(pub(super) gpui::Entity<gpdoc::EditorView>);
 
 impl Render for ExampleSurface {
     fn render(&mut self, _: &mut gpui::Window, _: &mut Context<Self>) -> impl IntoElement {

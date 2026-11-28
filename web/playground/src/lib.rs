@@ -1,7 +1,6 @@
 //! Browser editor for the gpdoc documentation and playground.
 #![cfg(target_family = "wasm")]
 
-mod icons;
 mod paragraph;
 mod plugins;
 mod view_examples;

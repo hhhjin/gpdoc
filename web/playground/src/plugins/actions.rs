@@ -1,6 +1,6 @@
 //! Actions exposed by the documentation toolbar.
 use super::*;
-use gpdoc::Command;
+use gpdoc::{Command, StoredCommand};
 use gpdoc_plugin_heading::Level;
 use serde::Deserialize;
 use std::num::{NonZeroU32, NonZeroUsize};
@@ -75,10 +75,7 @@ pub(super) enum DemoAction {
     InsertInlineMath {
         latex: String,
     },
-    StyleSelection {
-        color: String,
-        font_size: String,
-    },
+    StyleSelection(StyleSelection),
     WrapDetails {
         summary: String,
     },
@@ -101,14 +98,33 @@ pub(super) enum DemoAction {
         trigger: char,
     },
     Duplicate,
-    CheckTask {
-        position: usize,
-    },
 }
 
-impl PluginEditor {
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StyleSelection {
+    color: String,
+    font_size: String,
+}
+
+impl Command for StyleSelection {
+    const NAME: &'static str = "styleSelection";
+}
+
+pub(super) fn style_commands() -> gpdoc_core::plugin::Plugin {
+    gpdoc_core::plugin::Plugin::new("exampleTextStyle", |p| {
+        p.command::<StyleSelection>(|ctx, style| {
+            ctx.plan_chain([
+                StoredCommand::new(gpdoc_plugin_text_style::SetColor(Some(style.color))),
+                StoredCommand::new(gpdoc_plugin_text_style::SetFontSize(Some(style.font_size))),
+            ])
+        });
+    })
+}
+
+impl ActionContext<'_, '_> {
     fn run_command(&mut self, command: impl Command) -> Result<()> {
-        match self.edit(|editor| editor.run(command))? {
+        match self.view.run(command, self.window, self.cx)? {
             CommandOutcome::Applied(_) => Ok(()),
             CommandOutcome::NotApplicable => {
                 Err("This command cannot run at the current selection.".into())
@@ -171,7 +187,11 @@ impl PluginEditor {
                 with_header_row,
             }),
             SetImage { src, alt, width } => self.run_command(gpdoc_plugin_image::Set {
-                src,
+                src: self
+                    .view
+                    .resolve_media_url(&src)
+                    .ok_or("Enter an HTTP or HTTPS image URL.")?
+                    .into(),
                 alt,
                 width,
                 ..Default::default()
@@ -184,22 +204,16 @@ impl PluginEditor {
             InsertInlineMath { latex } => {
                 self.run_command(gpdoc_plugin_mathematics::InsertInline { latex, pos: None })
             }
-            StyleSelection { color, font_size } => {
-                if matches!(
-                    self.editor
-                        .chain()
-                        .command(gpdoc_plugin_text_style::SetColor(Some(color)))
-                        .command(gpdoc_plugin_text_style::SetFontSize(Some(font_size)))
-                        .run()?,
-                    CommandOutcome::NotApplicable
-                ) {
-                    return Err("Select text to style.".into());
-                }
-                Ok(())
-            }
+            StyleSelection(style) => self.run_command(style),
             WrapDetails { summary } => {
                 self.run_command(gpdoc_plugin_details::Set)?;
-                InputKind::Text.apply(&mut self.editor, &summary)?;
+                let editor = self.view.editor();
+                let mut tx = editor.transaction();
+                tx.push(Edit::ReplaceText {
+                    range: editor.selection().bounds(editor.document()),
+                    text: summary,
+                });
+                self.view.apply_node_view(tx, self.window, self.cx)?;
                 Ok(())
             }
             AcceptMention { label } => {
@@ -211,13 +225,13 @@ impl PluginEditor {
                 use gpdoc_plugin_find_and_replace::{ReplaceAll, SetReplaceTerm, SetSearchTerm};
                 self.run_command(SetSearchTerm(term))?;
                 self.run_command(SetReplaceTerm(replacement))?;
-                self.editor.run(ReplaceAll)?;
+                self.run_command(ReplaceAll)?;
                 Ok(())
             }
             SetMarkdown { markdown } => {
-                let imported = gpdoc_plugin_markdown::open(self.editor.config(), &markdown)?;
+                let imported = gpdoc_plugin_markdown::open(self.view.editor().config(), &markdown)?;
                 self.run_command(gpdoc_plugin_markdown::Set { markdown })?;
-                self.facts = imported
+                *self.facts = imported
                     .warnings
                     .into_iter()
                     .map(|warning| ("Warning".into(), warning.message))
@@ -225,8 +239,8 @@ impl PluginEditor {
                 Ok(())
             }
             ExportMarkdown => {
-                let exported = gpdoc_plugin_markdown::to_markdown(&self.editor)?;
-                self.facts = vec![("Markdown".into(), exported.value)];
+                let exported = gpdoc_plugin_markdown::to_markdown(self.view.editor())?;
+                *self.facts = vec![("Markdown".into(), exported.value)];
                 self.facts.extend(
                     exported
                         .warnings
@@ -236,9 +250,11 @@ impl PluginEditor {
                 Ok(())
             }
             FindSuggestion { trigger } => {
-                let found = gpdoc_plugin_suggestion::Trigger::new(trigger)
-                    .find(self.editor.document(), self.editor.selection());
-                self.facts = match found {
+                let found = gpdoc_plugin_suggestion::Trigger::new(trigger).find(
+                    self.view.editor().document(),
+                    self.view.editor().selection(),
+                );
+                *self.facts = match found {
                     Some(found) => vec![
                         ("Query".into(), found.query),
                         (
@@ -250,20 +266,23 @@ impl PluginEditor {
                 };
                 Ok(())
             }
-            Duplicate => self.duplicate(),
-            CheckTask { position } => {
-                let item = self
-                    .editor
-                    .document()
-                    .node_at(DocPos(position))
-                    .filter(|node| node.kind == "taskItem")
-                    .ok_or("Select a task.")?;
-                let checked = item
-                    .attrs
-                    .get("checked")
-                    .and_then(Value::as_bool)
-                    .unwrap_or_default();
-                self.attribute(position, "checked", Value::Bool(!checked))
+            Duplicate => {
+                let editor = self.view.editor();
+                let start = editor.selection().bounds(editor.document()).start;
+                let mut end = DocPos(0);
+                for node in editor.document().blocks() {
+                    end = DocPos(end.0 + node.size());
+                    if start < end {
+                        let mut tx = editor.transaction();
+                        tx.push(Edit::ReplaceNodes {
+                            range: end..end,
+                            nodes: vec![node.clone()],
+                        });
+                        self.view.apply_node_view(tx, self.window, self.cx)?;
+                        return Ok(());
+                    }
+                }
+                Err("Place the caret in a block first.".into())
             }
         }
     }

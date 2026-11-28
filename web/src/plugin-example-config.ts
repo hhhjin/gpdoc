@@ -6,7 +6,7 @@ type Field = Label & (
   | { kind: "select"; choices: Choice[]; boolean?: boolean }
 );
 
-export type CommandArgs = Record<string, boolean | number | string>;
+type CommandArgs = Record<string, boolean | number | string>;
 
 type Action = {
   id: string;
@@ -142,7 +142,3 @@ export const pluginExamples = {
   collaboration: example("Release notes", "Type in either editor to see the change in both."),
   "collaboration-caret": example("Release notes", "Move the caret in either editor to see it in the other. Edits sync as you type."),
 } satisfies Record<string, Example>;
-
-export function pluginExample(id: string): Example | undefined {
-  return Object.entries(pluginExamples).find(([key]) => key === id)?.[1];
-}

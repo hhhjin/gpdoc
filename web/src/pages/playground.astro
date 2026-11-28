@@ -11,12 +11,14 @@
     <noscript>Enable JavaScript to open the editor.</noscript>
     <script>
       const status = document.getElementById("editor-status");
+      const host = window.frameElement;
       try {
-        const { default: init, start, start_view_example } = await import("../generated/gpdoc-editor.js");
+        const { default: init, start, start_plugin_example, start_view_example } = await import("../generated/gpdoc-editor.js");
         await init();
-        const host = window.frameElement;
         const viewExample = host?.getAttribute("data-view-example");
-        if (viewExample) {
+        if (host?.hasAttribute("data-plugin-example")) {
+          start_plugin_example(host.getAttribute("data-plugin-example")!, host.getAttribute("data-config")!, host.ownerDocument.baseURI);
+        } else if (viewExample) {
           if (viewExample === "file-handler") {
             const result = document.createElement("output");
             result.id = "paste-result";

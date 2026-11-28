@@ -1,4 +1,3 @@
-import { setupPlugin } from "./plugin-examples";
 import type { ParagraphExample as RustParagraph } from "../generated/gpdoc-editor.js";
 
 type Report = (message: string, error?: boolean) => void;
@@ -169,10 +168,10 @@ function setupJson(form: HTMLFormElement, roundTrip: (source: string) => string,
 }
 
 const forms = document.querySelectorAll<HTMLFormElement>("form[data-doc-example]");
-const engine = import("../generated/gpdoc-editor.js").then(async (module) => {
+const engine = forms.length ? import("../generated/gpdoc-editor.js").then(async (module) => {
   await module.default();
   return module;
-});
+}) : undefined;
 
 for (const form of forms) {
   const status = form.querySelector<HTMLElement>("[data-status]");
@@ -184,13 +183,10 @@ for (const form of forms) {
     status.toggleAttribute("data-error", error);
   };
 
-  engine.then(({ ParagraphExample, round_trip, PluginEditor }) => {
+  engine?.then(({ ParagraphExample, round_trip }) => {
     switch (form.dataset.docExample) {
       case "format":
         setupFormat(form, ParagraphExample, report);
-        break;
-      case "plugin":
-        setupPlugin(form, PluginEditor, report);
         break;
       case "json":
         setupJson(form, round_trip, report);

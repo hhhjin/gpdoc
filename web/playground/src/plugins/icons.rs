@@ -1,8 +1,7 @@
 use gpui_icons::LucideIcon;
 
-#[wasm_bindgen::prelude::wasm_bindgen]
-pub fn toolbar_icon(command: &str) -> String {
-    let icon = match command {
+pub(super) fn icon(command: &str) -> LucideIcon {
+    match command {
         "acceptMention" => LucideIcon::AtSign,
         "addColumnAfter" => LucideIcon::BetweenVerticalEnd,
         "addRowAfter" => LucideIcon::BetweenHorizontalEnd,
@@ -52,8 +51,5 @@ pub fn toolbar_icon(command: &str) -> String {
         "unsetRubyText" => LucideIcon::RemoveFormatting,
         "replaceMatches" => LucideIcon::ReplaceAll,
         _ => LucideIcon::MousePointerClick,
-    };
-    std::str::from_utf8(icon.svg_bytes())
-        .expect("Lucide SVG is UTF-8")
-        .to_owned()
+    }
 }
